@@ -1,0 +1,45 @@
+{% extends "index.html" %}
+
+{% block content %}
+<!-- Tab Navigation -->
+<div class="tab-navigation">
+    <a href="{{ url_for('main.index') }}" class="tab">
+        Home
+    </a>
+    <a href="{{ url_for('main.transformation') }}" class="tab {% if active_tab == 'transformation' %}active{% endif %}">
+        Transformation
+    </a>
+    <a href="{{ url_for('main.erkennung') }}" class="tab {% if active_tab == 'erkennung' %}active{% endif %}">
+        Erkennung
+    </a>
+    <a href="{{ url_for('main.matching') }}" class="tab {% if active_tab == 'matching' %}active{% endif %}">
+        Matching
+    </a>
+</div>
+
+<!-- Detail Container mit Grid Layout -->
+<div class="detail-container">
+    <!-- Bild Container (Links) -->
+    <div class="image-container">
+        {% block image_content %}
+        Bild
+        {% endblock %}
+    </div>
+
+    <!-- Steps Container (Rechts) -->
+    <div class="steps-container">
+        <!-- Schritte Liste -->
+        <div class="steps-list">
+            {% block steps %}
+            <!-- Wird von Child-Templates überschrieben -->
+            {% endblock %}
+        </div>
+
+        <!-- Button Container -->
+        <div class="button-container">
+            <button class="btn">zurück</button>
+            <button class="btn">weiter</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

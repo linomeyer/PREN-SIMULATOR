@@ -1,0 +1,166 @@
+/* Flex Container für die 3 Cards */
+.flex-container {
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    margin: 40px auto;
+    max-width: 1200px;
+    padding: 0 20px;
+}
+
+/* Card Styles */
+.flex-item {
+    flex: 1;
+    background-color: #f5f5f5;
+    border: 2px solid #d0d0d0;
+    border-radius: 30px;
+    padding: 60px 40px;
+    text-align: center;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.flex-item:hover {
+    background-color: #e8e8e8;
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Link Styles für Cards */
+a.flex-item {
+    text-decoration: none;
+    color: inherit;
+}
+
+a.flex-item:visited {
+    color: inherit;
+}
+
+/* Styling für Überschriften */
+h1 {
+    font-size: 32px;
+    margin: 20px 0 10px 0;
+}
+
+h2 {
+    font-size: 28px;
+    margin: 40px 0 20px 0;
+}
+
+h3 {
+    font-size: 20px;
+    font-weight: normal;
+    margin: 0 0 20px 0;
+}
+
+/* Body Styling */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 3px solid #000;
+}
+
+.tab {
+    padding: 15px 30px;
+    background-color: #888;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px 10px 0 0;
+    font-size: 18px;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.tab:hover {
+    background-color: #666;
+}
+
+.tab.active {
+    background-color: #000;
+}
+
+/* Detail Page Grid Layout */
+.detail-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+/* Image Container (Links) */
+.image-container {
+    background-color: #f5f5f5;
+    border: 2px solid #d0d0d0;
+    border-radius: 30px;
+    padding: 40px;
+    min-height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #666;
+}
+
+/* Steps Container (Rechts) */
+.steps-container {
+    background-color: #e8e8e8;
+    border-radius: 30px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.step-item {
+    background-color: white;
+    padding: 20px 25px;
+    border-radius: 15px;
+    font-size: 16px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Button Container */
+.button-container {
+    display: flex;
+    gap: 15px;
+    justify-content: space-between;
+}
+
+.btn {
+    flex: 1;
+    padding: 15px 30px;
+    background-color: white;
+    border: 2px solid #d0d0d0;
+    border-radius: 15px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #f5f5f5;
+    transform: translateY(-2px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
