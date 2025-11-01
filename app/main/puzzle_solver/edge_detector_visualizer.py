@@ -69,9 +69,6 @@ class EdgeVisualizer:
                 cv2.putText(piece_img, edge_type, tuple(mid_point),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-            # Add piece ID
-            cv2.putText(piece_img, f"Piece {idx}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0, 255), 2)
 
             # Save image
             edge_filename = f"edges_{idx}_{original_filename}"

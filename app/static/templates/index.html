@@ -8,18 +8,18 @@
 </head>
 <body>
     <div class="container">
-        <h1> Puzzle löser</h1>
-        <p class="subtitle">Lade ein Bild eines ungelöstes Puzzles hoch. Das Puzzle wird Schritt für Schritt gelöst!</p>
+        <h1>Puzzle Piece Solver</h1>
+        <p class="subtitle">Upload a picture of an unsolved puzzle. The puzzle will be solved step-by-step</p>
 
         <div class="upload-section">
             <div class="file-input-wrapper">
                 <input type="file" id="fileInput" accept="image/*">
-                <label for="fileInput" class="file-input-label">1 - 📁 Bild wählen</label>
+                <label for="fileInput" class="file-input-label">1 - 📁 Choose image</label>
             </div>
-            <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
-            <button id="cornersBtn" class="btn" disabled>3 - Ecken finden</button>
-            <button id="matchingBtn" class="btn" disabled>4 - Übereinstimmungen finden</button>
-            <button id="solverBtn" class="btn" disabled>5 - Puzzle lösen</button>
+            <button id="extractBtn" class="btn" disabled>2 - Extract pieces</button>
+            <button id="cornersBtn" class="btn" disabled>3 - Detect edges</button>
+            <button id="matchingBtn" class="btn" disabled>4 - Find matches</button>
+            <button id="solverBtn" class="btn" disabled>5 - Solve puzzle</button>
         </div>
 
         <div id="status" class="status"></div>
@@ -281,7 +281,7 @@
                 const edgeInfo = data.edge_info[idx];
                 const pieceCard = document.createElement('div');
                 pieceCard.className = 'piece-card';
-                
+
                 // Build edge info HTML
                 let edgeInfoHTML = '';
                 for (const [edgeType, info] of Object.entries(edgeInfo.edges)) {
