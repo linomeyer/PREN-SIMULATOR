@@ -14,7 +14,7 @@
         <div class="upload-section">
             <div class="file-input-wrapper">
                 <input type="file" id="fileInput" accept="image/*">
-                <label for="fileInput" class="file-input-label">1 - Bild wählen</label>
+                <label for="fileInput" class="file-input-label">1 - 📁 Bild wählen</label>
             </div>
             <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
             <button id="cornersBtn" class="btn" disabled>3 - Ecken finden</button>
@@ -26,23 +26,38 @@
 
         <div id="loading" class="loading">
             <div class="spinner"></div>
-            <p>Extracting puzzle pieces... This may take a moment.</p>
+            <p id="loadingText">Processing...</p>
         </div>
 
-        <div id="results" class="results">
-            <!-- Statistics Section -->
+        <!-- Extraction Results -->
+        <div id="extractionResults" class="results">
             <div class="section">
-                <h2> Statistics</h2>
-                <div class="stats-grid" id="statsGrid"></div>
+                <h2>📊 Extraction Statistics</h2>
+                <div class="stats-grid" id="extractionStatsGrid"></div>
             </div>
 
-            <!-- Individual Pieces -->
             <div class="section">
-                <h2> Extracted Pieces with Contours</h2>
+                <h2>🔍 Extracted Pieces with Contours</h2>
                 <p class="section-description">
                     Each piece is extracted with its contour shown in green. The pieces have transparent backgrounds.
                 </p>
-                <div class="pieces-grid" id="piecesGrid"></div>
+                <div class="pieces-grid" id="extractedPiecesGrid"></div>
+            </div>
+        </div>
+
+        <!-- Edge Detection Results -->
+        <div id="edgeResults" class="results">
+            <div class="section">
+                <h2>📏 Edge Detection Statistics</h2>
+                <div class="stats-grid" id="edgeStatsGrid"></div>
+            </div>
+
+            <div class="section">
+                <h2>🔲 Pieces with Detected Edges</h2>
+                <p class="section-description">
+                    Each piece showing its four edges: Red = Top, Green = Right, Blue = Bottom, Yellow = Left
+                </p>
+                <div class="pieces-grid" id="edgePiecesGrid"></div>
             </div>
         </div>
     </div>
@@ -50,20 +65,23 @@
     <script>
         const fileInput = document.getElementById('fileInput');
         const extractBtn = document.getElementById('extractBtn');
+        const cornersBtn = document.getElementById('cornersBtn');
         const status = document.getElementById('status');
         const loading = document.getElementById('loading');
-        const results = document.getElementById('results');
-        const minAreaInput = document.getElementById('minArea');
-        const maxAreaInput = document.getElementById('maxArea');
+        const loadingText = document.getElementById('loadingText');
+        const extractionResults = document.getElementById('extractionResults');
+        const edgeResults = document.getElementById('edgeResults');
 
         let uploadedFilename = null;
 
         fileInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
                 extractBtn.disabled = false;
+                cornersBtn.disabled = true;
                 showStatus('File selected: ' + this.files[0].name, 'info');
                 uploadedFilename = null;
-                results.classList.remove('active');
+                extractionResults.classList.remove('active');
+                edgeResults.classList.remove('active');
             }
         });
 
@@ -74,10 +92,16 @@
                 return;
             }
 
+            // Disable extract button
+            extractBtn.disabled = true;
+            cornersBtn.disabled = true;
+
             // Upload file
             showStatus('Uploading file...', 'info');
+            loadingText.textContent = 'Uploading file...';
             loading.classList.add('active');
-            results.classList.remove('active');
+            extractionResults.classList.remove('active');
+            edgeResults.classList.remove('active');
 
             const formData = new FormData();
             formData.append('file', file);
@@ -96,21 +120,59 @@
 
                 uploadedFilename = uploadResult.filename;
                 showStatus('File uploaded. Extracting pieces...', 'info');
+                loadingText.textContent = 'Extracting puzzle pieces...';
 
-                let extractUrl = `/extract/${uploadedFilename}`;
-                const extractResponse = await fetch(extractUrl);
+                // Extract pieces
+                const extractResponse = await fetch(`/extract/${uploadedFilename}`);
                 const extractResult = await extractResponse.json();
 
                 if (!extractResult.success) {
                     throw new Error(extractResult.error || 'Extraction failed');
                 }
 
-                // Display results
-                displayResults(extractResult);
+                // Display extraction results
+                displayExtractionResults(extractResult);
                 showStatus(`Successfully extracted ${extractResult.num_pieces} puzzle pieces!`, 'success');
+
+                // Enable edge detection button
+                cornersBtn.disabled = false;
 
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');
+                extractBtn.disabled = false;
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        cornersBtn.addEventListener('click', async function() {
+            if (!uploadedFilename) {
+                showStatus('Please extract pieces first', 'error');
+                return;
+            }
+
+            // Disable button
+            cornersBtn.disabled = true;
+
+            showStatus('Detecting edges...', 'info');
+            loadingText.textContent = 'Detecting edges...';
+            loading.classList.add('active');
+
+            try {
+                const edgeResponse = await fetch(`/detect-edges/${uploadedFilename}`);
+                const edgeResult = await edgeResponse.json();
+
+                if (!edgeResult.success) {
+                    throw new Error(edgeResult.error || 'Edge detection failed');
+                }
+
+                // Display edge detection results
+                displayEdgeResults(edgeResult);
+                showStatus(`Successfully detected ${edgeResult.num_edges} edges!`, 'success');
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                cornersBtn.disabled = false;
             } finally {
                 loading.classList.remove('active');
             }
@@ -121,12 +183,12 @@
             status.className = 'status ' + type;
         }
 
-        function displayResults(data) {
+        function displayExtractionResults(data) {
             // Show results section
-            results.classList.add('active');
+            extractionResults.classList.add('active');
 
             // Display statistics
-            const statsGrid = document.getElementById('statsGrid');
+            const statsGrid = document.getElementById('extractionStatsGrid');
             const stats = data.statistics;
             statsGrid.innerHTML = `
                 <div class="stat-card">
@@ -152,7 +214,7 @@
             `;
 
             // Display individual pieces
-            const piecesGrid = document.getElementById('piecesGrid');
+            const piecesGrid = document.getElementById('extractedPiecesGrid');
             piecesGrid.innerHTML = '';
 
             data.images.pieces.forEach((pieceFilename, idx) => {
@@ -173,7 +235,71 @@
             });
 
             // Scroll to results
-            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            extractionResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function displayEdgeResults(data) {
+            // Show edge results section
+            edgeResults.classList.add('active');
+
+            // Display edge statistics
+            const edgeStatsGrid = document.getElementById('edgeStatsGrid');
+            const stats = data.statistics;
+            edgeStatsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="value">${data.num_edges}</div>
+                    <div class="label">Total Edges</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${Math.round(stats.avg_edge_length)}</div>
+                    <div class="label">Avg Length (px)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${stats.flat_edges}</div>
+                    <div class="label">Flat Edges</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${stats.tab_edges}</div>
+                    <div class="label">Tab Edges</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${stats.slot_edges}</div>
+                    <div class="label">Slot Edges</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${Math.round(stats.min_edge_length)} - ${Math.round(stats.max_edge_length)}</div>
+                    <div class="label">Length Range (px)</div>
+                </div>
+            `;
+
+
+            // Display pieces with edges
+            const edgePiecesGrid = document.getElementById('edgePiecesGrid');
+            edgePiecesGrid.innerHTML = '';
+
+            data.images.edge_pieces.forEach((edgeFilename, idx) => {
+                const edgeInfo = data.edge_info[idx];
+                const pieceCard = document.createElement('div');
+                pieceCard.className = 'piece-card';
+                
+                // Build edge info HTML
+                let edgeInfoHTML = '';
+                for (const [edgeType, info] of Object.entries(edgeInfo.edges)) {
+                    edgeInfoHTML += `<div><strong>${edgeType}:</strong> ${info.classification} (${Math.round(info.length)}px)</div>`;
+                }
+                
+                pieceCard.innerHTML = `
+                    <img src="/output/${edgeFilename}" alt="Piece ${idx} edges">
+                    <div class="piece-info">
+                        <div><strong>Piece ID:</strong> ${idx}</div>
+                        ${edgeInfoHTML}
+                    </div>
+                `;
+                edgePiecesGrid.appendChild(pieceCard);
+            });
+
+            // Scroll to edge results
+            edgeResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     </script>
 </body>

@@ -301,8 +301,8 @@ class EdgeDetector:
 
         return edge_points.reshape(-1, 1, 2)
 
-    @staticmethod
-    def find_nearest_point_index(points: np.ndarray, target: Tuple[int, int]) -> int:
+
+    def _find_nearest_point_index(self, points: np.ndarray, target: Tuple[int, int]) -> int:
         distances = np.linalg.norm(points - np.array(target), axis=1)
         return int(np.argmin(distances))
 
@@ -326,6 +326,15 @@ class EdgeDetector:
         return stats
 
     def get_piece_edge_info(self, piece_id: int) -> Dict:
+        """
+        Get information about all edges of a specific piece.
+
+        Args:
+            piece_id: ID of the piece
+
+        Returns:
+            Dictionary with edge information
+        """
         if piece_id not in self.piece_edges:
             return {}
 
@@ -334,11 +343,11 @@ class EdgeDetector:
 
         for edge_type, edge in edges.items():
             info[edge_type] = {
-                'length': edge.length,
+                'length': float(edge.length),
                 'classification': edge.get_edge_type_classification(),
-                'start_point': edge.start_point,
-                'end_point': edge.end_point,
-                'num_points': len(edge.points)
+                'start_point': [int(edge.start_point[0]), int(edge.start_point[1])],
+                'end_point': [int(edge.end_point[0]), int(edge.end_point[1])],
+                'num_points': int(len(edge.points))
             }
 
         return info

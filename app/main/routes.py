@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, send_file
+from flask import render_template, request, jsonify, send_file, session
 from werkzeug.utils import secure_filename
 import os
 import cv2
@@ -6,14 +6,17 @@ import numpy as np
 from app.main import main_bp
 from app.main.puzzle_solver.extractor import PieceSegmenter
 from app.main.puzzle_solver.extractor_visualizer import PieceVisualizer
+from app.main.puzzle_solver.edge_detector import EdgeDetector
+from app.main.puzzle_solver.edge_detector_visualizer import EdgeVisualizer
 
-UPLOAD_FOLDER = '/main/img'
+UPLOAD_FOLDER = 'app/main/img'
 OUTPUT_FOLDER = '/static/output'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+segmenters_cache = {}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -67,6 +70,9 @@ def extract_pieces(filename):
         if not pieces:
             return jsonify({'error': 'No puzzle pieces detected. Try adjusting the parameters.'}), 400
 
+        # Store segmenter in cache for edge detection step
+        segmenters_cache[filename] = segmenter
+
         # Get statistics
         stats = segmenter.get_piece_statistics()
 
@@ -93,6 +99,57 @@ def extract_pieces(filename):
             'pieces': piece_info,
             'images': {
                 'pieces': piece_images
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/detect-edges/<filename>')
+def detect_edges(filename):
+    """Detect edges for extracted puzzle pieces."""
+
+    # Check if we have a cached segmenter
+    if filename not in segmenters_cache:
+        return jsonify({'error': 'Please extract pieces first'}), 400
+
+    try:
+        segmenter = segmenters_cache[filename]
+
+        # Initialize edge detector
+        edge_detector = EdgeDetector(segmenter.pieces)
+
+        # Detect edges
+        edges = edge_detector.detect_edges()
+
+        if not edges:
+            return jsonify({'error': 'No edges detected'}), 400
+
+        # Get edge statistics
+        edge_stats = edge_detector.get_edge_statistics()
+
+        # Visualize edges
+        edge_visualizer = EdgeVisualizer(output_dir=OUTPUT_FOLDER)
+        edge_images = edge_visualizer.visualize_piece_edges(segmenter, edge_detector, filename)
+
+        # Prepare edge info for each piece
+        edge_info = []
+        for piece_id in range(len(segmenter.pieces)):
+            piece_edge_info = edge_detector.get_piece_edge_info(piece_id)
+            edge_info.append({
+                'piece_id': piece_id,
+                'edges': piece_edge_info
+            })
+
+        return jsonify({
+            'success': True,
+            'num_edges': len(edges),
+            'statistics': {k: float(v) if isinstance(v, (np.float64, np.float32)) else v
+                          for k, v in edge_stats.items()},
+            'edge_info': edge_info,
+            'images': {
+                'edge_pieces': edge_images,
             }
         })
 

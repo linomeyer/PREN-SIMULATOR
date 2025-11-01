@@ -3,7 +3,7 @@ import numpy as np
 import os
 from typing import List
 from app.main.puzzle_solver.extractor import PieceSegmenter
-from app.main.puzzle_solver.edge_detection import EdgeDetector, PieceEdge
+from app.main.puzzle_solver.edge_detector import EdgeDetector, PieceEdge
 
 
 class EdgeVisualizer:
@@ -81,50 +81,3 @@ class EdgeVisualizer:
             edge_filenames.append(edge_filename)
 
         return edge_filenames
-
-    def visualize_edge_classifications(self, segmenter: PieceSegmenter,
-                                       edge_detector: EdgeDetector,
-                                       original_filename: str) -> str:
-        """
-        Create a visualization showing edge classifications (flat/tab/slot).
-
-        Args:
-            segmenter: PieceSegmenter with extracted pieces
-            edge_detector: EdgeDetector with detected edges
-            original_filename: Original filename
-
-        Returns:
-            Output filename
-        """
-        # Create canvas
-        img = segmenter.image.copy()
-
-        # Colors for classifications
-        classification_colors = {
-            'flat': (128, 128, 128),  # Gray
-            'tab': (0, 255, 0),  # Green
-            'slot': (255, 0, 0)  # Red
-        }
-
-        # Draw all edges with classification colors
-        for edge in edge_detector.edges:
-            classification = edge.get_edge_type_classification()
-            color = classification_colors.get(classification, (255, 255, 255))
-
-            points = edge.points.astype(np.int32)
-            cv2.polylines(img, [points], False, color, 3)
-
-        # Add legend
-        legend_y = 30
-        for classification, color in classification_colors.items():
-            cv2.rectangle(img, (10, legend_y), (30, legend_y + 20), color, -1)
-            cv2.putText(img, classification, (40, legend_y + 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            legend_y += 30
-
-        # Save image
-        output_filename = f"edge_classifications_{original_filename}"
-        output_path = os.path.join(self.output_dir, output_filename)
-        cv2.imwrite(output_path, img)
-
-        return output_filename
