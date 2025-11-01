@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Piece Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1> Puzzle löser</h1>
+        <p class="subtitle">Lade ein Bild eines ungelöstes Puzzles hoch. Das Puzzle wird Schritt für Schritt gelöst!</p>
+
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept="image/*">
+                <label for="fileInput" class="file-input-label">1 - Bild wählen</label>
+            </div>
+            <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
+            <button id="cornersBtn" class="btn" disabled>3 - Ecken finden</button>
+            <button id="matchingBtn" class="btn" disabled>4 - Übereinstimmungen finden</button>
+            <button id="solverBtn" class="btn" disabled>5 - Puzzle lösen</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Extracting puzzle pieces... This may take a moment.</p>
+        </div>
+
+        <div id="results" class="results">
+            <!-- Statistics Section -->
+            <div class="section">
+                <h2> Statistics</h2>
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+
+            <!-- Individual Pieces -->
+            <div class="section">
+                <h2> Extracted Pieces with Contours</h2>
+                <p class="section-description">
+                    Each piece is extracted with its contour shown in green. The pieces have transparent backgrounds.
+                </p>
+                <div class="pieces-grid" id="piecesGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const extractBtn = document.getElementById('extractBtn');
+        const status = document.getElementById('status');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const minAreaInput = document.getElementById('minArea');
+        const maxAreaInput = document.getElementById('maxArea');
+
+        let uploadedFilename = null;
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                extractBtn.disabled = false;
+                showStatus('File selected: ' + this.files[0].name, 'info');
+                uploadedFilename = null;
+                results.classList.remove('active');
+            }
+        });
+
+        extractBtn.addEventListener('click', async function() {
+            const file = fileInput.files[0];
+            if (!file) {
+                showStatus('Please select a file first', 'error');
+                return;
+            }
+
+            // Upload file
+            showStatus('Uploading file...', 'info');
+            loading.classList.add('active');
+            results.classList.remove('active');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const uploadResponse = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const uploadResult = await uploadResponse.json();
+
+                if (!uploadResult.success) {
+                    throw new Error(uploadResult.error || 'Upload failed');
+                }
+
+                uploadedFilename = uploadResult.filename;
+                showStatus('File uploaded. Extracting pieces...', 'info');
+
+                let extractUrl = `/extract/${uploadedFilename}`;
+                const extractResponse = await fetch(extractUrl);
+                const extractResult = await extractResponse.json();
+
+                if (!extractResult.success) {
+                    throw new Error(extractResult.error || 'Extraction failed');
+                }
+
+                // Display results
+                displayResults(extractResult);
+                showStatus(`Successfully extracted ${extractResult.num_pieces} puzzle pieces!`, 'success');
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+
+        function displayResults(data) {
+            // Show results section
+            results.classList.add('active');
+
+            // Display statistics
+            const statsGrid = document.getElementById('statsGrid');
+            const stats = data.statistics;
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="value">${data.num_pieces}</div>
+                    <div class="label">Pieces Found</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${Math.round(stats.avg_area)}</div>
+                    <div class="label">Avg Area (px²)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${Math.round(stats.min_area)}</div>
+                    <div class="label">Min Area (px²)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${Math.round(stats.max_area)}</div>
+                    <div class="label">Max Area (px²)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value">${Math.round(stats.avg_perimeter)}</div>
+                    <div class="label">Avg Perimeter (px)</div>
+                </div>
+            `;
+
+            // Display individual pieces
+            const piecesGrid = document.getElementById('piecesGrid');
+            piecesGrid.innerHTML = '';
+
+            data.images.pieces.forEach((pieceFilename, idx) => {
+                const piece = data.pieces[idx];
+                const pieceCard = document.createElement('div');
+                pieceCard.className = 'piece-card';
+                pieceCard.innerHTML = `
+                    <img src="/output/${pieceFilename}" alt="Piece ${idx}">
+                    <div class="piece-info">
+                        <div><strong>Piece ID:</strong> ${idx}</div>
+                        <div><strong>Area:</strong> ${Math.round(piece.area)} px²</div>
+                        <div><strong>Perimeter:</strong> ${Math.round(piece.perimeter)} px</div>
+                        <div><strong>Center:</strong> (${piece.center[0]}, ${piece.center[1]})</div>
+                        <div><strong>Size:</strong> ${piece.bbox.width} × ${piece.bbox.height}</div>
+                    </div>
+                `;
+                piecesGrid.appendChild(pieceCard);
+            });
+
+            // Scroll to results
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    </script>
+</body>
+</html>
