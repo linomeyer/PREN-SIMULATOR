@@ -10,7 +10,7 @@ from app.main.puzzle_solver.edge_detector import EdgeDetector
 from app.main.puzzle_solver.edge_detector_visualizer import EdgeVisualizer
 
 UPLOAD_FOLDER = 'app/main/img'
-OUTPUT_FOLDER = '/static/output'
+OUTPUT_FOLDER = 'app/static/output'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
