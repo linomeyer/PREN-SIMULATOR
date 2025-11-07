@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Puzzle Piece Solver</title>
+    <title>Puzzle-Teile-Löser</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Puzzle Piece Solver</h1>
-        <p class="subtitle">Upload a picture of an unsolved puzzle. The puzzle will be solved step-by-step</p>
+        <h1>Puzzle-Teile-Löser</h1>
+        <p class="subtitle">Lade ein Bild eines ungelösten Puzzles hoch. Das Puzzle wird Schritt für Schritt gelöst.</p>
 
         <div class="upload-section">
             <div class="file-input-wrapper">
                 <input type="file" id="fileInput" accept="image/*">
-                <label for="fileInput" class="file-input-label">1 - 📁 Choose image</label>
+                <label for="fileInput" class="file-input-label">1 - 📁 Bild auswählen</label>
             </div>
-            <button id="extractBtn" class="btn" disabled>2 - Extract pieces</button>
-            <button id="cornersBtn" class="btn" disabled>3 - Detect edges</button>
-            <button id="matchingBtn" class="btn" disabled>4 - Find matches</button>
-            <button id="solverBtn" class="btn" disabled>5 - Solve puzzle</button>
+            <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
+            <button id="cornersBtn" class="btn" disabled>3 - Kanten erkennen</button>
+            <button id="matchingBtn" class="btn" disabled>4 - Matches finden</button>
+            <button id="solverBtn" class="btn" disabled>5 - Puzzle lösen</button>
         </div>
 
         <div id="status" class="status"></div>
@@ -32,14 +32,14 @@
         <!-- Extraction Results -->
         <div id="extractionResults" class="results">
             <div class="section">
-                <h2>📊 Extraction Statistics</h2>
+                <h2>📊 Auslese Statistiken</h2>
                 <div class="stats-grid" id="extractionStatsGrid"></div>
             </div>
 
             <div class="section">
-                <h2>🔍 Extracted Pieces with Contours</h2>
+                <h2>🔍 Extrahierte Teile mit Konturen</h2>
                 <p class="section-description">
-                    Each piece is extracted with its contour shown in green. The pieces have transparent backgrounds.
+                    Bei jedem Teil werden die Konturen in grün gezeigt. Die Teile haben einen transparenten Hintergrund.
                 </p>
                 <div class="pieces-grid" id="extractedPiecesGrid"></div>
             </div>
@@ -48,14 +48,14 @@
         <!-- Edge Detection Results -->
         <div id="edgeResults" class="results">
             <div class="section">
-                <h2>📏 Edge Detection Statistics</h2>
+                <h2>📏 Kantenerkennung Statistiken</h2>
                 <div class="stats-grid" id="edgeStatsGrid"></div>
             </div>
 
             <div class="section">
-                <h2>🔲 Pieces with Detected Edges</h2>
+                <h2>🔲 Teile mit erkannten Kanten</h2>
                 <p class="section-description">
-                    Each piece showing its four edges: Red = Top, Green = Right, Blue = Bottom, Yellow = Left
+                    Jedes Teil zeigt seine vier Kanten: Red = Top, Green = Right, Blue = Bottom, Yellow = Left
                 </p>
                 <div class="pieces-grid" id="edgePiecesGrid"></div>
             </div>
