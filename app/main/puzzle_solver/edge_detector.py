@@ -177,8 +177,8 @@ class EdgeDetector:
                 (x, y + h)  # bottom-left
             ]
 
-        # Sort corners to get consistent ordering (top-left, top-right, bottom-right, bottom-left)
-        corners = self._sort_corners(corners)
+        # Don't re-sort corners - they're already in the correct order from _find_corners
+        # corners is already: [top-left, top-right, bottom-right, bottom-left]
 
         # Extract edge segments between corners
         edges = {}
@@ -208,43 +208,24 @@ class EdgeDetector:
         Returns:
             List of corner coordinates
         """
-        # Approximate the contour to reduce points
-        epsilon = 0.02 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, epsilon, True)
-
-        # If approximation gives us roughly the right number of corners, use those
-        if len(approx) >= num_corners and len(approx) <= num_corners + 2:
-            return [tuple(point[0]) for point in approx[:num_corners]]
-
-        # Otherwise, find corners using curvature analysis
         contour_2d = contour.reshape(-1, 2)
-        angles = []
 
-        window_size = max(5, len(contour_2d) // 50)
+        # Find the 4 extreme points (top-left, top-right, bottom-right, bottom-left)
+        # These form the rectangular bounding area of the puzzle piece
 
-        for i in range(len(contour_2d)):
-            p1_idx = (i - window_size) % len(contour_2d)
-            p2_idx = i
-            p3_idx = (i + window_size) % len(contour_2d)
+        # Top-left: minimize x + y
+        tl = contour_2d[np.argmin(contour_2d[:, 0] + contour_2d[:, 1])]
 
-            p1 = contour_2d[p1_idx]
-            p2 = contour_2d[p2_idx]
-            p3 = contour_2d[p3_idx]
+        # Top-right: maximize x - y
+        tr = contour_2d[np.argmax(contour_2d[:, 0] - contour_2d[:, 1])]
 
-            v1 = p2 - p1
-            v2 = p3 - p2
+        # Bottom-right: maximize x + y
+        br = contour_2d[np.argmax(contour_2d[:, 0] + contour_2d[:, 1])]
 
-            # Calculate angle
-            angle = np.arctan2(v2[1], v2[0]) - np.arctan2(v1[1], v1[0])
-            angle = abs(np.arctan2(np.sin(angle), np.cos(angle)))
-            angles.append((i, angle))
+        # Bottom-left: minimize x - y
+        bl = contour_2d[np.argmin(contour_2d[:, 0] - contour_2d[:, 1])]
 
-        # Find peaks (corners) in angles
-        angles.sort(key=lambda x: x[1], reverse=True)
-        corner_indices = [angles[i][0] for i in range(min(num_corners, len(angles)))]
-        corner_indices.sort()
-
-        corners = [tuple(contour_2d[idx]) for idx in corner_indices]
+        corners = [tuple(tl), tuple(tr), tuple(br), tuple(bl)]
         return corners
 
     def _sort_corners(self, corners: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
@@ -292,12 +273,28 @@ class EdgeDetector:
         start_idx = self._find_nearest_point_index(contour_2d, start_corner)
         end_idx = self._find_nearest_point_index(contour_2d, end_corner)
 
-        # Extract points between corners
+        # Calculate both possible path lengths
         if end_idx > start_idx:
-            edge_points = contour_2d[start_idx:end_idx + 1]
+            forward_length = end_idx - start_idx
+            backward_length = len(contour_2d) - forward_length
         else:
-            # Wrap around
-            edge_points = np.vstack([contour_2d[start_idx:], contour_2d[:end_idx + 1]])
+            backward_length = start_idx - end_idx
+            forward_length = len(contour_2d) - backward_length
+
+        # Take the shorter path
+        if forward_length <= backward_length:
+            if end_idx > start_idx:
+                edge_points = contour_2d[start_idx:end_idx]
+            else:
+                edge_points = np.vstack([contour_2d[start_idx:], contour_2d[:end_idx]])
+        else:
+            # Go backwards
+            if start_idx > end_idx:
+                edge_points = contour_2d[end_idx:start_idx]
+            else:
+                edge_points = np.vstack([contour_2d[end_idx:], contour_2d[:start_idx]])
+            # Reverse to maintain direction
+            edge_points = edge_points[::-1]
 
         return edge_points.reshape(-1, 1, 2)
 
