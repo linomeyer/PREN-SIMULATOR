@@ -1,4 +1,4 @@
-app/static/output
+app/static/output/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
