@@ -160,7 +160,7 @@ def detect_edges(filename):
 @main_bp.route('/output/<path:filename>')
 def get_output_image(filename):
     """Serve output images."""
-    filepath = os.path.join(OUTPUT_FOLDER, filename)
+    filepath = os.path.join("static/output", filename)
 
     if os.path.exists(filepath):
         return send_file(filepath)

@@ -6,7 +6,7 @@ from app.main.puzzle_solver.extractor import PieceSegmenter
 
 class PieceVisualizer:
 
-    def __init__(self, output_dir: str = 'app/main/static/output'):
+    def __init__(self, output_dir: str = 'app/static/output'):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
