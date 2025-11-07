@@ -1,6 +1,7 @@
 from flask import render_template, request, jsonify, send_file, session
 from werkzeug.utils import secure_filename
 import os
+from pathlib import Path
 import cv2
 import numpy as np
 from app.main import main_bp
@@ -9,8 +10,10 @@ from app.main.puzzle_solver.extractor_visualizer import PieceVisualizer
 from app.main.puzzle_solver.edge_detector import EdgeDetector
 from app.main.puzzle_solver.edge_detector_visualizer import EdgeVisualizer
 
-UPLOAD_FOLDER = 'app/main/img'
-OUTPUT_FOLDER = 'app/static/output'
+# Get absolute base path (app/ directory)
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOAD_FOLDER = BASE_DIR / 'main' / 'img'
+OUTPUT_FOLDER = BASE_DIR / 'static' / 'output'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -40,8 +43,8 @@ def upload_image():
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+        filepath = UPLOAD_FOLDER / filename
+        file.save(str(filepath))
 
         return jsonify({
             'success': True,
@@ -54,15 +57,15 @@ def upload_image():
 
 @main_bp.route('/extract/<filename>')
 def extract_pieces(filename):
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    filepath = UPLOAD_FOLDER / filename
 
-    if not os.path.exists(filepath):
+    if not filepath.exists():
         return jsonify({'error': 'File not found'}), 404
 
     try:
         # Initialize segmenter and visualizer
-        segmenter = PieceSegmenter(filepath)
-        visualizer = PieceVisualizer(output_dir=OUTPUT_FOLDER)
+        segmenter = PieceSegmenter(str(filepath))
+        visualizer = PieceVisualizer(output_dir=str(OUTPUT_FOLDER))
 
         # Segment pieces
         pieces = segmenter.segment_pieces()
@@ -130,7 +133,7 @@ def detect_edges(filename):
         edge_stats = edge_detector.get_edge_statistics()
 
         # Visualize edges
-        edge_visualizer = EdgeVisualizer(output_dir=OUTPUT_FOLDER)
+        edge_visualizer = EdgeVisualizer(output_dir=str(OUTPUT_FOLDER))
         edge_images = edge_visualizer.visualize_piece_edges(segmenter, edge_detector, filename)
 
         # Prepare edge info for each piece
@@ -160,9 +163,9 @@ def detect_edges(filename):
 @main_bp.route('/output/<path:filename>')
 def get_output_image(filename):
     """Serve output images."""
-    filepath = os.path.join("static/output", filename)
+    filepath = OUTPUT_FOLDER / filename
 
-    if os.path.exists(filepath):
-        return send_file(filepath)
+    if filepath.exists():
+        return send_file(str(filepath))
 
     return jsonify({'error': 'Image not found'}), 404
