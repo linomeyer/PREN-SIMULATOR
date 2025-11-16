@@ -283,3 +283,35 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             margin-top: 15px;
         }
+
+        #matchVisualizationsGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(800px, 1fr));
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        #matchVisualizationsGrid .piece-card {
+            width: 100%;
+            max-width: none;
+        }
+
+        #matchVisualizationsGrid .piece-card img {
+            width: 100%;
+            height: auto;
+            max-height: none;
+            object-fit: contain;
+        }
+
+        /* Responsive adjustments for match visualizations */
+        @media (max-width: 1600px) {
+            #matchVisualizationsGrid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 1601px) {
+            #matchVisualizationsGrid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }

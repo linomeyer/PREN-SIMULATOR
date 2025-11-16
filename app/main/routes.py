@@ -5,6 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 from app.main import main_bp
+from app.main.puzzle_solver.edge_matcher import EdgeMatcher
+from app.main.puzzle_solver.edge_matcher_visualizer import MatchVisualizer
 from app.main.puzzle_solver.extractor import PieceSegmenter
 from app.main.puzzle_solver.extractor_visualizer import PieceVisualizer
 from app.main.puzzle_solver.edge_detector import EdgeDetector
@@ -169,3 +171,75 @@ def get_output_image(filename):
         return send_file(str(filepath))
 
     return jsonify({'error': 'Image not found'}), 404
+
+
+@main_bp.route('/match-edges/<filename>')
+def match_edges(filename):
+    """Find matching edges between puzzle pieces."""
+
+    # Check if we have a cached segmenter
+    if filename not in segmenters_cache:
+        return jsonify({'error': 'Please extract pieces first'}), 400
+
+    try:
+        segmenter = segmenters_cache[filename]
+
+        # Initialize edge detector if not already done
+        edge_detector = EdgeDetector(segmenter.pieces)
+        edge_detector.detect_edges()
+
+        # Initialize edge matcher
+        edge_matcher = EdgeMatcher(edge_detector)
+
+        # Find matches (by default, skip flat edges)
+        min_score = float(request.args.get('min_score', 0.6))
+        include_flat = request.args.get('include_flat', 'false').lower() == 'true'
+        matches = edge_matcher.find_matches(min_score=min_score, include_flat_edges=include_flat)
+
+        # Get match statistics (includes border piece info)
+        match_stats = edge_matcher.get_match_statistics()
+
+        # Visualize matches
+        match_visualizer = MatchVisualizer(output_dir=str(OUTPUT_FOLDER))
+        match_images = match_visualizer.visualize_best_matches(segmenter, edge_matcher, filename)
+
+        # Prepare match info
+        match_info = []
+        for match in matches[:50]:  # Limit to top 50 matches for response size
+            match_info.append({
+                'edge1': {
+                    'piece_id': match.edge1.piece_id,
+                    'edge_type': match.edge1.edge_type,
+                    'classification': match.edge1.get_edge_type_classification(),
+                    'length': float(match.edge1.length)
+                },
+                'edge2': {
+                    'piece_id': match.edge2.piece_id,
+                    'edge_type': match.edge2.edge_type,
+                    'classification': match.edge2.get_edge_type_classification(),
+                    'length': float(match.edge2.length)
+                },
+                'scores': {
+                    'compatibility': float(match.compatibility_score),
+                    'length_similarity': float(match.length_similarity),
+                    'shape_similarity': float(match.shape_similarity),
+                    'classification_match': match.classification_match
+                },
+                'rotation': {
+                    'degrees': match.rotation_offset * 90,
+                    'offset': match.rotation_offset
+                }
+            })
+
+        return jsonify({
+            'success': True,
+            'num_matches': len(matches),
+            'statistics': match_stats,
+            'matches': match_info,
+            'images': {
+                'match_visualizations': match_images
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

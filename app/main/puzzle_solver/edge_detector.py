@@ -199,34 +199,52 @@ class EdgeDetector:
 
     def _find_corners(self, contour: np.ndarray, num_corners: int = 4) -> List[Tuple[int, int]]:
         """
-        Find corner points in the contour using corner detection.
+        Find corner points in the contour using the bounding box as reference.
+        This ensures the corners form a proper rectangle.
 
         Args:
             contour: Contour of the puzzle piece
             num_corners: Expected number of corners
 
         Returns:
-            List of corner coordinates
+            List of corner coordinates in order: [top-left, top-right, bottom-right, bottom-left]
         """
         contour_2d = contour.reshape(-1, 2)
 
-        # Find the 4 extreme points (top-left, top-right, bottom-right, bottom-left)
-        # These form the rectangular bounding area of the puzzle piece
+        # Get the rotated bounding rectangle (handles rotated pieces better)
+        rect = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(rect)
+        box = box.astype(np.int32)
 
-        # Top-left: minimize x + y
-        tl = contour_2d[np.argmin(contour_2d[:, 0] + contour_2d[:, 1])]
+        # Sort box points to get consistent ordering: [top-left, top-right, bottom-right, bottom-left]
+        # First, sort by y-coordinate to get top 2 and bottom 2
+        sorted_by_y = box[np.argsort(box[:, 1])]
+        top_points = sorted_by_y[:2]
+        bottom_points = sorted_by_y[2:]
 
-        # Top-right: maximize x - y
-        tr = contour_2d[np.argmax(contour_2d[:, 0] - contour_2d[:, 1])]
+        # Sort top points by x (left to right)
+        top_points = top_points[np.argsort(top_points[:, 0])]
+        # Sort bottom points by x (left to right)
+        bottom_points = bottom_points[np.argsort(bottom_points[:, 0])]
 
-        # Bottom-right: maximize x + y
-        br = contour_2d[np.argmax(contour_2d[:, 0] + contour_2d[:, 1])]
+        # Create ordered rectangle corners
+        rect_corners = [
+            tuple(top_points[0]),  # top-left
+            tuple(top_points[1]),  # top-right
+            tuple(bottom_points[1]),  # bottom-right
+            tuple(bottom_points[0])  # bottom-left
+        ]
 
-        # Bottom-left: minimize x - y
-        bl = contour_2d[np.argmin(contour_2d[:, 0] - contour_2d[:, 1])]
+        # Now find the actual contour points closest to these ideal rectangle corners
+        actual_corners = []
+        for rect_corner in rect_corners:
+            # Find the contour point nearest to this rectangle corner
+            distances = np.linalg.norm(contour_2d - np.array(rect_corner), axis=1)
+            nearest_idx = np.argmin(distances)
+            actual_corner = tuple(contour_2d[nearest_idx])
+            actual_corners.append(actual_corner)
 
-        corners = [tuple(tl), tuple(tr), tuple(br), tuple(bl)]
-        return corners
+        return actual_corners
 
     def _sort_corners(self, corners: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
         """
