@@ -12,18 +12,20 @@
         <p class="subtitle">Lade ein Bild eines ungelösten Puzzles hoch. Das Puzzle wird Schritt für Schritt gelöst.</p>
 
         <div class="upload-section">
-            <div style="display: inline-block; margin-right: 10px;">
-                <div class="file-input-wrapper">
-                    <input type="file" id="fileInput" accept="image/*">
-                    <label for="fileInput" class="file-input-label">1 - Bild hochladen</label>
+            <div style="display: inline-block; vertical-align: middle;">
+                <button id="resetBtn" class="btn-icon">🔄</button>
+                <div class="btn-combined">
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    <label for="fileInput" class="btn-combined-half btn-combined-left">Bild hochladen</label>
+                    <button id="generateBtn" class="btn-combined-half btn-combined-right">Puzzle generieren</button>
                 </div>
-                <button id="generateBtn" class="btn" style="background: #4CAF50; margin-left: 10px;">oder: Puzzle generieren</button>
             </div>
-            <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
-            <button id="cornersBtn" class="btn" disabled>3 - Kanten erkennen</button>
-            <button id="matchingBtn" class="btn" disabled>4 - Matches finden</button>
-            <button id="solverBtn" class="btn" disabled>5 - Puzzle lösen</button>
-            <button id="resetBtn" class="btn" style="background: #ff5722; margin-left: 20px;">🔄 Neu starten</button>
+            <div style="display: inline-block; vertical-align: middle;">
+                <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
+                <button id="cornersBtn" class="btn" disabled>3 - Kanten erkennen</button>
+                <button id="matchingBtn" class="btn" disabled>4 - Matches finden</button>
+                <button id="solverBtn" class="btn" disabled>5 - Puzzle lösen</button>
+            </div>
         </div>
 
         <div id="status" class="status"></div>
