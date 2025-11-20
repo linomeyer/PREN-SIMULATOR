@@ -12,14 +12,18 @@
         <p class="subtitle">Lade ein Bild eines ungelösten Puzzles hoch. Das Puzzle wird Schritt für Schritt gelöst.</p>
 
         <div class="upload-section">
-            <div class="file-input-wrapper">
-                <input type="file" id="fileInput" accept="image/*">
-                <label for="fileInput" class="file-input-label">1 - Bild auswählen</label>
+            <div style="display: inline-block; margin-right: 10px;">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <label for="fileInput" class="file-input-label">1 - Bild hochladen</label>
+                </div>
+                <button id="generateBtn" class="btn" style="background: #4CAF50; margin-left: 10px;">oder: Puzzle generieren</button>
             </div>
             <button id="extractBtn" class="btn" disabled>2 - Teile extrahieren</button>
             <button id="cornersBtn" class="btn" disabled>3 - Kanten erkennen</button>
             <button id="matchingBtn" class="btn" disabled>4 - Matches finden</button>
             <button id="solverBtn" class="btn" disabled>5 - Puzzle lösen</button>
+            <button id="resetBtn" class="btn" style="background: #ff5722; margin-left: 20px;">🔄 Neu starten</button>
         </div>
 
         <div id="status" class="status"></div>
@@ -27,6 +31,17 @@
         <div id="loading" class="loading">
             <div class="spinner"></div>
             <p id="loadingText">Processing...</p>
+        </div>
+
+        <!-- Generated Puzzle Variants -->
+        <div id="generatedVariants" class="results">
+            <div class="section">
+                <h2>Generierte Puzzle-Varianten</h2>
+                <p class="section-description">
+                    Wähle eine Variante aus, um mit dem Lösen fortzufahren. Jede Variante zeigt das Kamera-Bild und die Lösung.
+                </p>
+                <div class="pieces-grid" id="variantsGrid" style="grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));"></div>
+            </div>
         </div>
 
         <!-- Extraction Results -->
@@ -90,17 +105,21 @@
 
     <script>
         const fileInput = document.getElementById('fileInput');
+        const generateBtn = document.getElementById('generateBtn');
         const extractBtn = document.getElementById('extractBtn');
         const cornersBtn = document.getElementById('cornersBtn');
         const matchingBtn = document.getElementById('matchingBtn');
+        const resetBtn = document.getElementById('resetBtn');
         const status = document.getElementById('status');
         const loading = document.getElementById('loading');
         const loadingText = document.getElementById('loadingText');
+        const generatedVariants = document.getElementById('generatedVariants');
         const extractionResults = document.getElementById('extractionResults');
         const edgeResults = document.getElementById('edgeResults');
         const matchResults = document.getElementById('matchResults');
 
         let uploadedFilename = null;
+        let selectedVariantBlob = null;
 
         fileInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
@@ -109,16 +128,70 @@
                 matchingBtn.disabled = true;
                 showStatus('File selected: ' + this.files[0].name, 'info');
                 uploadedFilename = null;
+                selectedVariantBlob = null;
                 extractionResults.classList.remove('active');
                 edgeResults.classList.remove('active');
                 matchResults.classList.remove('active');
+                generatedVariants.classList.remove('active');
+            }
+        });
+
+        generateBtn.addEventListener('click', async function() {
+            // Disable buttons
+            generateBtn.disabled = true;
+            extractBtn.disabled = true;
+            cornersBtn.disabled = true;
+            matchingBtn.disabled = true;
+
+            showStatus('Generiere 3 Puzzle-Varianten...', 'info');
+            loadingText.textContent = 'Generiere Puzzles (kann 5-15 Sekunden dauern)...';
+            loading.classList.add('active');
+            generatedVariants.classList.remove('active');
+            extractionResults.classList.remove('active');
+            edgeResults.classList.remove('active');
+            matchResults.classList.remove('active');
+
+            try {
+                // Generate 3 variants
+                const variants = [];
+                for (let i = 0; i < 3; i++) {
+                    loadingText.textContent = `Generiere Puzzle ${i + 1}/3...`;
+                    const response = await fetch('/puzzle-gen/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            layout: '2x3'
+                            // cut_types will be randomly selected on server-side
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (!result.success) {
+                        throw new Error(result.error || 'Generation failed');
+                    }
+
+                    variants.push(result);
+                }
+
+                // Display variants
+                displayVariants(variants);
+                showStatus('3 Puzzle-Varianten erfolgreich generiert! Wähle eine aus.', 'success');
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+                generateBtn.disabled = false;
+            } finally {
+                loading.classList.remove('active');
             }
         });
 
         extractBtn.addEventListener('click', async function() {
             const file = fileInput.files[0];
-            if (!file) {
-                showStatus('Please select a file first', 'error');
+            if (!file && !selectedVariantBlob) {
+                showStatus('Please select a file or generate a puzzle first', 'error');
                 return;
             }
 
@@ -127,7 +200,7 @@
             cornersBtn.disabled = true;
             matchingBtn.disabled = true;
 
-            // Upload file
+            // Upload file or use selected variant
             showStatus('Uploading file...', 'info');
             loadingText.textContent = 'Uploading file...';
             loading.classList.add('active');
@@ -136,7 +209,13 @@
             matchResults.classList.remove('active');
 
             const formData = new FormData();
-            formData.append('file', file);
+            if (selectedVariantBlob) {
+                // Use selected variant
+                formData.append('file', selectedVariantBlob, 'generated_puzzle.png');
+            } else {
+                // Use uploaded file
+                formData.append('file', file);
+            }
 
             try {
                 const uploadResponse = await fetch('/upload', {
@@ -245,6 +324,37 @@
             } finally {
                 loading.classList.remove('active');
             }
+        });
+
+        resetBtn.addEventListener('click', function() {
+            // Reset all state variables
+            uploadedFilename = null;
+            selectedVariantBlob = null;
+
+            // Reset file input
+            fileInput.value = '';
+
+            // Reset button states
+            generateBtn.disabled = false;
+            extractBtn.disabled = true;
+            cornersBtn.disabled = true;
+            matchingBtn.disabled = true;
+
+            // Hide all result sections
+            generatedVariants.classList.remove('active');
+            extractionResults.classList.remove('active');
+            edgeResults.classList.remove('active');
+            matchResults.classList.remove('active');
+
+            // Hide loading
+            loading.classList.remove('active');
+
+            // Reset status message
+            status.textContent = '';
+            status.className = 'status';
+
+            // Show reset message
+            showStatus('Zurückgesetzt. Wähle ein Bild oder generiere ein Puzzle.', 'info');
         });
 
         function showStatus(message, type) {
@@ -505,6 +615,92 @@
 
             // Scroll to match results
             matchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function displayVariants(variants) {
+            // Show variants section
+            generatedVariants.classList.add('active');
+
+            const variantsGrid = document.getElementById('variantsGrid');
+            variantsGrid.innerHTML = '';
+
+            variants.forEach((variant, idx) => {
+                const variantCard = document.createElement('div');
+                variantCard.className = 'piece-card';
+                variantCard.style.cursor = 'pointer';
+                variantCard.style.border = '3px solid transparent';
+                variantCard.style.transition = 'all 0.3s';
+
+                // Create metadata display
+                const metadata = variant.metadata;
+                const metadataHTML = `
+                    <div style="font-size: 0.9em; color: #555; margin-bottom: 10px;">
+                        <strong>Variante ${idx + 1}</strong><br>
+                        Seed: ${metadata.seed} | Layout: ${metadata.layout} | Teile: ${metadata.piece_count}<br>
+                        Cuts: ${metadata.cut_types.join(', ')}
+                    </div>
+                `;
+
+                variantCard.innerHTML = `
+                    ${metadataHTML}
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="margin-bottom: 5px;">Kamera-Bild (mit Rauschen)</h4>
+                        <img src="data:image/png;base64,${variant.noisy_image}" alt="Noisy puzzle" style="width: 100%; border-radius: 5px;">
+                    </div>
+                    <div>
+                        <h4 style="margin-bottom: 5px;">Lösung</h4>
+                        <img src="data:image/png;base64,${variant.solution_image}" alt="Solution puzzle" style="width: 100%; border-radius: 5px;">
+                    </div>
+                `;
+
+                // Add click handler to select variant
+                variantCard.addEventListener('click', function() {
+                    // Remove selection from all cards
+                    document.querySelectorAll('#variantsGrid .piece-card').forEach(card => {
+                        card.style.border = '3px solid transparent';
+                        card.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                    });
+
+                    // Mark this card as selected
+                    variantCard.style.border = '3px solid #4CAF50';
+                    variantCard.style.boxShadow = '0 4px 15px rgba(76, 175, 80, 0.4)';
+
+                    // Convert base64 to blob
+                    const base64Data = variant.noisy_image;
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    selectedVariantBlob = new Blob([byteArray], { type: 'image/png' });
+
+                    // Enable extract button
+                    extractBtn.disabled = false;
+                    cornersBtn.disabled = true;
+                    matchingBtn.disabled = true;
+                    uploadedFilename = null;
+
+                    showStatus(`Variante ${idx + 1} ausgewählt (Seed: ${metadata.seed}). Klicke auf "2 - Teile extrahieren" um fortzufahren.`, 'success');
+                });
+
+                // Add hover effect
+                variantCard.addEventListener('mouseenter', function() {
+                    if (variantCard.style.border !== '3px solid #4CAF50') {
+                        variantCard.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.2)';
+                    }
+                });
+                variantCard.addEventListener('mouseleave', function() {
+                    if (variantCard.style.border !== '3px solid #4CAF50') {
+                        variantCard.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                    }
+                });
+
+                variantsGrid.appendChild(variantCard);
+            });
+
+            // Scroll to variants
+            generatedVariants.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     </script>
 </body>

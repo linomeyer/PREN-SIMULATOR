@@ -1,4 +1,5 @@
 app/static/output/*
+app/main/img/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
