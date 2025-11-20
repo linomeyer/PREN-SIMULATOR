@@ -20,8 +20,7 @@ class MatchVisualizer:
                                edge_matcher: EdgeMatcher,
                                original_filename: str) -> List[str]:
         """
-        Create visualization showing the best unique match for each edge.
-        Eliminates duplicates by only showing each edge pair once.
+        Create visualization showing aligned edge comparisons.
 
         Args:
             segmenter: PieceSegmenter with extracted pieces
@@ -33,41 +32,18 @@ class MatchVisualizer:
         """
         match_filenames = []
 
-        # Get all matches sorted by score
+        # Get matches
         if not edge_matcher.matches:
-            edge_matcher.find_matches()
+            print("No matches to visualize")
+            return []
 
-        # Track which edges have been visualized to avoid duplicates
-        # Use the ORIGINAL edge types (before rotation)
-        visualized_edges: Set[Tuple[int, str]] = set()
-        unique_matches = []
+        matches = edge_matcher.matches
 
-        # Go through matches from best to worst
-        for match in edge_matcher.matches:
-            # Both edges use their ORIGINAL (unrotated) edge types
-            edge1_key = (match.edge1.piece_id, match.edge1.edge_type)
-            edge2_key = (match.edge2.piece_id, match.edge2.edge_type)
+        print(f"Creating visualizations for {len(matches)} unique matches")
 
-            # Skip if either edge has already been visualized
-            if edge1_key in visualized_edges or edge2_key in visualized_edges:
-                continue
-
-            # Skip flat edges
-            if (match.edge1.get_edge_type_classification() == 'flat' or
-                    match.edge2.get_edge_type_classification() == 'flat'):
-                continue
-
-            # Add this match and mark both edges as visualized
-            unique_matches.append(match)
-            visualized_edges.add(edge1_key)
-            visualized_edges.add(edge2_key)
-
-        print(f"Creating visualizations for {len(unique_matches)} unique matches")
-        print(f"Visualized edges: {len(visualized_edges)} out of possible edges")
-
-        # Visualize each unique match
-        for idx, match in enumerate(unique_matches):
-            match_img = self._create_edge_comparison(segmenter, match)
+        # Visualize each match
+        for idx, match in enumerate(matches):
+            match_img = self._create_aligned_edge_comparison(match)
 
             # Save image
             match_filename = (f"match_{idx:02d}_p{match.edge1.piece_id}_{match.edge1.edge_type}_"
@@ -79,117 +55,144 @@ class MatchVisualizer:
 
         return match_filenames
 
-    def _create_edge_comparison(self, segmenter: PieceSegmenter,
-                                match: EdgeMatch) -> np.ndarray:
+    def _create_aligned_edge_comparison(self, match: EdgeMatch) -> np.ndarray:
         """
-        Create a side-by-side comparison of two matching edges.
+        Create a visualization showing both edges aligned at their matched angle.
+        Only shows the edge lines, not the full pieces.
 
         Args:
-            segmenter: PieceSegmenter with pieces
             match: EdgeMatch to visualize
 
         Returns:
-            Visualization image showing edges side by side
+            Visualization image
         """
-        # Get the two pieces
-        piece1 = segmenter.pieces[match.edge1.piece_id]
-        piece2 = segmenter.pieces[match.edge2.piece_id]
+        # Image size
+        img_width = 800
+        img_height = 600
 
-        # Extract and visualize each edge
-        edge1_img = self._extract_edge_visualization(
-            piece1, match.edge1, f"Piece {match.edge1.piece_id}"
+        # Create white background
+        img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255
+
+        # Calculate positions for the two edges - side by side
+        edge1_center_x = img_width // 4
+        edge2_center_x = 3 * img_width // 4
+        center_y = img_height // 2
+
+        # Determine which edge is tab and which is slot
+        edge1_classification = match.edge1.get_edge_type_classification()
+        edge2_classification = match.edge2.get_edge_type_classification()
+
+        # Base rotations to make edges vertical:
+        # Tab should be rotated 270° (or -90°) to be vertical with tab on right
+        # Slot should be rotated 90° to be vertical with slot on left
+        if edge1_classification == 'tab':
+            edge1_base_rotation = -90.0  # 270° = -90°
+        else:  # slot
+            edge1_base_rotation = 90.0
+
+        if edge2_classification == 'tab':
+            edge2_base_rotation = -90.0  # 270° = -90°
+        else:  # slot
+            edge2_base_rotation = 90.0
+
+        # Draw edge 1 (left side) with just base rotation
+        self._draw_edge_at_angle(
+            img, match.edge1,
+            (edge1_center_x, center_y),
+            edge1_base_rotation,
+            (0, 0, 255),  # Red
+            f"Piece {match.edge1.piece_id} ({match.edge1.edge_type})"
         )
-        edge2_img = self._extract_edge_visualization(
-            piece2, match.edge2, f"Piece {match.edge2.piece_id}"
+
+        # Draw edge 2 (right side) with base rotation PLUS alignment
+        # The alignment ensures edge2 faces edge1 properly
+        alignment_rotation = match.edge1.angle - match.edge2.angle + 180.0
+        edge2_total_rotation = edge2_base_rotation + alignment_rotation
+
+        self._draw_edge_at_angle(
+            img, match.edge2,
+            (edge2_center_x, center_y),
+            edge2_total_rotation,
+            (255, 0, 0),  # Blue
+            f"Piece {match.edge2.piece_id} ({match.edge2.edge_type})"
         )
 
-        # Make both images the same height
-        max_height = max(edge1_img.shape[0], edge2_img.shape[0])
-        edge1_img = self._pad_to_height(edge1_img, max_height)
-        edge2_img = self._pad_to_height(edge2_img, max_height)
+        # Add header with match information
+        header_height = 120
+        header = self._create_match_header(match, img_width)
 
-        # Create header with match information
-        header = self._create_match_header(match, edge1_img.shape[1] + edge2_img.shape[1])
-
-        # Combine edges horizontally
-        edges_combined = np.hstack([edge1_img, edge2_img])
-
-        # Add arrow between edges
-        arrow_overlay = edges_combined.copy()
-        mid_x = edge1_img.shape[1]
-        mid_y = edges_combined.shape[0] // 2
-        cv2.arrowedLine(arrow_overlay, (mid_x - 50, mid_y), (mid_x + 50, mid_y),
-                        (0, 255, 0), 4, tipLength=0.3)
-        edges_combined = cv2.addWeighted(edges_combined, 0.7, arrow_overlay, 0.3, 0)
-
-        # Stack header on top
-        result = np.vstack([header, edges_combined])
+        # Combine header and visualization
+        result = np.vstack([header, img])
 
         return result
 
-    def _extract_edge_visualization(self, piece, edge: PieceEdge,
-                                    title: str) -> np.ndarray:
+    def _draw_edge_at_angle(self, img: np.ndarray, edge: PieceEdge,
+                            center: Tuple[int, int], rotation_angle: float,
+                            color: Tuple[int, int, int], label: str):
         """
-        Extract and visualize a single edge with context.
+        Draw an edge at a specific position and rotation.
 
         Args:
-            piece: PuzzlePiece object
-            edge: PieceEdge to visualize
-            title: Title for the visualization
-
-        Returns:
-            Image showing the edge
+            img: Image to draw on
+            edge: PieceEdge to draw
+            center: Center position (x, y) for the edge
+            rotation_angle: Total rotation to apply in degrees
+            color: BGR color for the edge
+            label: Text label for the edge
         """
-        # Convert piece image to BGR
-        if piece.image.shape[2] == 4:
-            img = np.ones((piece.image.shape[0], piece.image.shape[1], 3), dtype=np.uint8) * 255
-            alpha = piece.image[:, :, 3:4] / 255.0
-            piece_bgr = cv2.cvtColor(piece.image[:, :, :3], cv2.COLOR_RGB2BGR)
-            img = (img * (1 - alpha) + piece_bgr * alpha).astype(np.uint8)
-        else:
-            img = piece.image.copy()
+        # Get edge points
+        points = edge.points.reshape(-1, 2).astype(np.float32)
 
-        # Get piece bbox to adjust coordinates
-        x, y, w, h = piece.bbox
+        # Center the points around origin
+        edge_center = np.mean(points, axis=0)
+        centered_points = points - edge_center
 
-        # Draw the full contour lightly
-        local_points = (edge.points - [x, y]).astype(np.int32)
+        # Apply the rotation (remove the original edge angle and apply new rotation)
+        total_rotation = np.radians(-edge.angle + rotation_angle)
 
-        # Draw all contour in light gray
-        piece_contour = (piece.contour - [x, y]).reshape(-1, 2).astype(np.int32)
-        cv2.polylines(img, [piece_contour], True, (200, 200, 200), 2)
+        # Create rotation matrix
+        cos_angle = np.cos(total_rotation)
+        sin_angle = np.sin(total_rotation)
+        rotation_matrix = np.array([[cos_angle, -sin_angle],
+                                    [sin_angle, cos_angle]])
 
-        # Highlight the specific edge in bright color
-        edge_color = (0, 0, 255)  # Red for the matching edge
-        cv2.polylines(img, [local_points], False, edge_color, 5)
+        # Rotate points
+        rotated_points = centered_points @ rotation_matrix.T
 
-        # Draw start and end points
-        start_local = (edge.start_point[0] - x, edge.start_point[1] - y)
-        end_local = (edge.end_point[0] - x, edge.end_point[1] - y)
-        cv2.circle(img, start_local, 8, (0, 255, 0), -1)  # Green
-        cv2.circle(img, end_local, 8, (255, 0, 0), -1)  # Blue
+        # Scale to fit nicely (normalize to around 300 pixels for better visibility)
+        scale = 300.0 / max(np.max(np.abs(rotated_points)), 1.0)
+        scaled_points = rotated_points * scale
 
-        # Add edge type label
-        label_pos = local_points[len(local_points) // 2][0]
-        cv2.putText(img, edge.edge_type.upper(), tuple(label_pos),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, edge_color, 3)
+        # Translate to center position
+        final_points = scaled_points + np.array(center)
+        final_points = final_points.astype(np.int32)
 
-        # Add title and edge info
-        title_height = 80
-        info_img = np.ones((img.shape[0] + title_height, img.shape[1], 3), dtype=np.uint8) * 250
-        info_img[title_height:, :] = img
+        # Draw the edge line
+        cv2.polylines(img, [final_points], False, color, 3, cv2.LINE_AA)
 
-        # Add title
-        cv2.putText(info_img, title, (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+        # Add label above the edge
+        label_pos = (center[0] - 80, center[1] - 230)
+        cv2.putText(img, label, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6, (0, 0, 0), 2, cv2.LINE_AA)
 
-        # Add edge details
-        edge_class = edge.get_edge_type_classification()
-        details = f"{edge.edge_type}: {edge_class} ({int(edge.length)}px)"
-        cv2.putText(info_img, details, (10, 55),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
+        # Add angle information
+        angle_text = f"Angle: {edge.angle:.1f}°"
+        angle_pos = (center[0] - 60, center[1] - 210)
+        cv2.putText(img, angle_text, angle_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (100, 100, 100), 1, cv2.LINE_AA)
 
-        return info_img
+        # Add classification
+        class_text = f"Type: {edge.get_edge_type_classification()}"
+        class_pos = (center[0] - 60, center[1] - 190)
+        cv2.putText(img, class_text, class_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (100, 100, 100), 1, cv2.LINE_AA)
+
+        # Add length
+        length_text = f"Length: {int(edge.length)}px"
+        length_pos = (center[0] - 60, center[1] - 170)
+        cv2.putText(img, length_text, length_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (100, 100, 100), 1, cv2.LINE_AA)
+
 
     def _create_match_header(self, match: EdgeMatch, width: int) -> np.ndarray:
         """
@@ -202,27 +205,46 @@ class MatchVisualizer:
         Returns:
             Header image
         """
-        header_height = 100
+        header_height = 120
         header = np.ones((header_height, width, 3), dtype=np.uint8) * 240
 
         # Title
-        title = f"EDGE MATCH COMPARISON"
-        cv2.putText(header, title, (width // 2 - 200, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
+        title = "EDGE MATCH COMPARISON - ALIGNED VIEW"
+        cv2.putText(header, title, (width // 2 - 250, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2, cv2.LINE_AA)
 
-        # Match details
-        details = [
-            f"Compatibility Score: {match.compatibility_score:.3f}",
-            f"Length Similarity: {match.length_similarity:.2f}",
-            f"Shape Similarity: {match.shape_similarity:.2f}",
-            f"Rotation: {match.rotation_offset * 90}°"
+        # Match details - left column
+        details_left = [
+            f"Edge 1: Piece {match.edge1.piece_id} ({match.edge1.edge_type})",
+            f"  Angle: {match.edge1.angle:.1f}°",
+            f"  Type: {match.edge1.get_edge_type_classification()}",
+            f"  Length: {int(match.edge1.length)}px"
         ]
 
-        y_pos = 60
-        for detail in details:
+        y_pos = 55
+        for detail in details_left:
             cv2.putText(header, detail, (20, y_pos),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-            y_pos += 20
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (50, 50, 50), 1, cv2.LINE_AA)
+            y_pos += 18
+
+        # Match details - right column
+        details_right = [
+            f"Edge 2: Piece {match.edge2.piece_id} ({match.edge2.edge_type})",
+            f"  Angle: {match.edge2.angle:.1f}°",
+            f"  Type: {match.edge2.get_edge_type_classification()}",
+            f"  Length: {int(match.edge2.length)}px"
+        ]
+
+        y_pos = 55
+        for detail in details_right:
+            cv2.putText(header, detail, (width // 2 + 20, y_pos),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (50, 50, 50), 1, cv2.LINE_AA)
+            y_pos += 18
+
+        # Score in the center
+        score_text = f"Match Score: {match.compatibility_score:.3f}"
+        cv2.putText(header, score_text, (width // 2 - 120, header_height // 2 + 35),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2, cv2.LINE_AA)
 
         # Color code the score
         score = match.compatibility_score
@@ -236,29 +258,7 @@ class MatchVisualizer:
             score_color = (0, 0, 200)  # Red
             score_label = "LOW"
 
-        cv2.putText(header, score_label, (width - 150, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, score_color, 3)
+        cv2.putText(header, score_label, (width // 2 - 40, header_height - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, score_color, 2, cv2.LINE_AA)
 
         return header
-
-    def _pad_to_height(self, img: np.ndarray, target_height: int) -> np.ndarray:
-        """
-        Pad image to target height.
-
-        Args:
-            img: Image to pad
-            target_height: Desired height
-
-        Returns:
-            Padded image
-        """
-        if img.shape[0] >= target_height:
-            return img
-
-        pad_top = (target_height - img.shape[0]) // 2
-        pad_bottom = target_height - img.shape[0] - pad_top
-
-        padded = np.ones((target_height, img.shape[1], 3), dtype=np.uint8) * 255
-        padded[pad_top:pad_top + img.shape[0], :] = img
-
-        return padded
