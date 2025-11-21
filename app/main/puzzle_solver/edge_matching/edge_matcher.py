@@ -1,8 +1,7 @@
-import cv2
 import numpy as np
-from typing import List, Tuple, Dict, Optional, Set
+from typing import List, Tuple, Dict, Set
 from dataclasses import dataclass
-from app.main.puzzle_solver.edge_detector import PieceEdge, EdgeDetector
+from app.main.puzzle_solver.edge_detection.edge_detector import PieceEdge, EdgeDetector
 
 @dataclass
 class EdgeMatch:
@@ -145,7 +144,7 @@ class EdgeMatcher:
             List of EdgeMatch objects
         """
         matches = []
-        angle_tolerance = 10.0  # Tightened to 10° deviation for matching
+        angle_tolerance = 2.0  # Tightened to 10° deviation for matching
 
         # For each edge of piece1
         for edge1_type, edge1 in edges1.items():

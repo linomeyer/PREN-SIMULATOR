@@ -39,15 +39,19 @@
             text-align: center;
             margin-bottom: 30px;
             padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: white;
+            border-radius: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .file-input-wrapper {
             position: relative;
             display: inline-block;
             cursor: pointer;
-            margin-right: 10px;
+            vertical-align: middle;
         }
 
         .file-input-wrapper input[type=file] {
@@ -80,6 +84,7 @@
             font-size: 16px;
             font-weight: 500;
             transition: background 0.3s;
+            vertical-align: middle;
         }
 
         .btn:hover:not(:disabled) {
@@ -87,6 +92,58 @@
         }
 
         .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-icon {
+            width: 50px;
+            height: 50px;
+            padding: 0;
+            background: #ff5722;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 24px;
+            transition: background 0.3s;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        .btn-icon:hover {
+            background: #e64a19;
+        }
+
+        .btn-combined {
+            display: inline-flex;
+            vertical-align: middle;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .btn-combined-half {
+            padding: 12px 30px;
+            background: #764ba2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.3s;
+            border: none;
+            outline: none;
+        }
+
+        .btn-combined-left {
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-combined-half:hover {
+            background: #667eea;
+        }
+
+        .btn-combined-half:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
@@ -212,8 +269,12 @@
         .section h2 {
             color: #333;
             margin-bottom: 15px;
-            padding-bottom: 10px;
+            padding: 15px 0 10px 0;
             border-bottom: 3px solid #667eea;
+            position: sticky;
+            top: 100px;
+            z-index: 90;
+            background: white;
         }
 
         .section-description {

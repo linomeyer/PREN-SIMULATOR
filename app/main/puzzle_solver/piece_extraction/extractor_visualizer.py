@@ -1,7 +1,7 @@
 import cv2
 import os
 from typing import List
-from app.main.puzzle_solver.extractor import PieceSegmenter
+from app.main.puzzle_solver.piece_extraction.extractor import PieceSegmenter
 
 
 class PieceVisualizer:

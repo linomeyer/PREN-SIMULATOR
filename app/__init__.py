@@ -17,4 +17,7 @@ def create_app():
     from app.main import main_bp
     app.register_blueprint(main_bp)
 
+    from app.puzzle_gen import puzzle_gen_bp
+    app.register_blueprint(puzzle_gen_bp)
+
     return app
