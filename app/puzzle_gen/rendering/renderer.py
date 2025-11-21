@@ -3,7 +3,7 @@ import math
 from typing import List, Tuple
 import random
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 import numpy as np
 
 from ..geometry.puzzle import PuzzlePiece
@@ -18,7 +18,12 @@ class PuzzleRenderer:
         height: int,
         background_color: Tuple[int, int, int] = (255, 255, 255),
         piece_color: Tuple[int, int, int] = (0, 0, 0),
-        background_noise: float = 0.02
+        background_noise: float = 0.02,
+        shadow_enabled: bool = True,
+        shadow_offset_x: int = 15,
+        shadow_offset_y: int = 15,
+        shadow_blur_radius: int = 20,
+        shadow_opacity: float = 0.4
     ):
         """
         Initialize renderer.
@@ -29,12 +34,22 @@ class PuzzleRenderer:
             background_color: RGB background color
             piece_color: RGB piece color
             background_noise: Background texture noise intensity (0-1)
+            shadow_enabled: Enable shadow rendering
+            shadow_offset_x: Shadow offset in X direction (pixels)
+            shadow_offset_y: Shadow offset in Y direction (pixels)
+            shadow_blur_radius: Gaussian blur radius for soft shadows
+            shadow_opacity: Shadow opacity (0-1)
         """
         self.width = width
         self.height = height
         self.background_color = background_color
         self.piece_color = piece_color
         self.background_noise = background_noise
+        self.shadow_enabled = shadow_enabled
+        self.shadow_offset_x = shadow_offset_x
+        self.shadow_offset_y = shadow_offset_y
+        self.shadow_blur_radius = shadow_blur_radius
+        self.shadow_opacity = shadow_opacity
 
     def _create_background(self) -> Image.Image:
         """
@@ -142,6 +157,51 @@ class PuzzleRenderer:
 
         return transformed_points
 
+    def _render_shadow(
+        self,
+        piece: PuzzlePiece,
+        num_points_per_edge: int,
+        scale_factor: float
+    ) -> Image.Image:
+        """
+        Render a soft shadow for a single piece.
+
+        Args:
+            piece: Puzzle piece to render shadow for
+            num_points_per_edge: Points per edge
+            scale_factor: Scaling factor
+
+        Returns:
+            PIL Image with shadow (RGBA, transparent background)
+        """
+        # Create transparent canvas for shadow
+        shadow_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        shadow_draw = ImageDraw.Draw(shadow_img)
+
+        # Get transformed outline with offset
+        outline = self._transform_piece_points(piece, num_points_per_edge, scale_factor)
+
+        # Apply shadow offset
+        offset_outline = [
+            (x + self.shadow_offset_x, y + self.shadow_offset_y)
+            for x, y in outline
+        ]
+
+        # Calculate shadow color with opacity
+        shadow_alpha = int(255 * self.shadow_opacity)
+        shadow_color = (0, 0, 0, shadow_alpha)
+
+        # Draw shadow polygon
+        shadow_draw.polygon(offset_outline, fill=shadow_color)
+
+        # Apply Gaussian blur for soft edges
+        if self.shadow_blur_radius > 0:
+            shadow_img = shadow_img.filter(
+                ImageFilter.GaussianBlur(radius=self.shadow_blur_radius)
+            )
+
+        return shadow_img
+
     def render(
         self,
         pieces: List[PuzzlePiece],
@@ -162,10 +222,17 @@ class PuzzleRenderer:
         # Create background
         img = self._create_background()
 
+        # Render shadows first (if enabled)
+        if self.shadow_enabled:
+            for piece in pieces:
+                shadow = self._render_shadow(piece, num_points_per_edge, scale_factor)
+                # Composite shadow onto background using alpha blending
+                img = Image.alpha_composite(img.convert('RGBA'), shadow).convert('RGB')
+
         # Create drawing context
         draw = ImageDraw.Draw(img, 'RGBA')
 
-        # Draw each piece
+        # Draw each piece on top of shadows
         for piece in pieces:
             # Get transformed outline with scaling
             outline = self._transform_piece_points(piece, num_points_per_edge, scale_factor)

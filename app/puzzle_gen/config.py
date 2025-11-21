@@ -77,6 +77,13 @@ class RenderConfig:
     # Puzzle pieces
     piece_color: Tuple[int, int, int] = (0, 0, 0)  # Black
 
+    # Shadows (realistic 3D effect)
+    shadow_enabled: bool = True  # Enable/disable shadow rendering
+    shadow_offset_x: int = 30  # Shadow offset in X direction (pixels) - INCREASED
+    shadow_offset_y: int = 30  # Shadow offset in Y direction (pixels) - INCREASED
+    shadow_blur_radius: int = 35  # Gaussian blur radius for soft shadows - INCREASED
+    shadow_opacity: float = 0.7  # Shadow opacity (0-1) - INCREASED
+
     # Cut parameters
     cut_depth_ratio: float = 0.075  # Cut depth as ratio of edge length (5-10%)
     wave_frequency: int = 2  # Number of waves for wavy cuts
@@ -84,25 +91,45 @@ class RenderConfig:
 
 @dataclass
 class CameraConfig:
-    """Configuration for camera simulation effects."""
-    # Overall intensity control (0-1, where 1 is realistic RasPi v3)
+    """Configuration for camera simulation effects (cheap smartphone camera - EXTREME MODE)."""
+    # Overall intensity control (0-1, where 1 is realistic cheap smartphone)
     intensity: float = 1.0
 
-    # Individual effect parameters (0-1 each)
-    fisheye_strength: float = 0.15  # Barrel distortion strength
-    noise_amount: float = 0.08  # Gaussian + salt-pepper noise (increased from 0.03)
-    vignette_strength: float = 0.2  # Radial lighting gradient
-    color_aberration: float = 0.02  # Chromatic aberration
-    color_noise: float = 0.03  # Color noise in BW scene (increased from 0.01)
+    # Distortions - DRAMATICALLY INCREASED
+    fisheye_strength: float = 0.65  # Barrel distortion strength (EXTREME: was 0.35)
+    perspective_strength: float = 0.45  # Perspective distortion from camera angle (EXTREME: was 0.15)
+    lens_softness: float = 0.6  # Edge softness/blur (EXTREME: was 0.2)
+
+    # Chromatic effects - DRAMATICALLY INCREASED
+    color_aberration: float = 0.25  # Chromatic aberration (EXTREME: was 0.08)
+    color_noise: float = 0.35  # Color noise in BW scene (EXTREME: was 0.12)
+    purple_fringing_intensity: float = 0.75  # Purple fringing at high-contrast edges (EXTREME: was 0.25)
+
+    # Noise - DRAMATICALLY INCREASED
+    noise_amount: float = 0.25  # Gaussian + salt-pepper noise (EXTREME: was 0.08)
+    vignette_strength: float = 0.5  # Radial lighting gradient (EXTREME: was 0.2)
+
+    # Smartphone-specific processing artifacts - DRAMATICALLY INCREASED
+    oversharpening_amount: float = 1.8  # Aggressive software sharpening (EXTREME: was 0.8, max 2.0)
+    noise_reduction_strength: float = 0.7  # Detail loss from noise reduction (EXTREME: was 0.3)
 
     def get_scaled_params(self) -> dict[str, float]:
         """Get effect parameters scaled by overall intensity."""
         return {
+            # Distortions
             'fisheye': self.fisheye_strength * self.intensity,
-            'noise': self.noise_amount * self.intensity,
-            'vignette': self.vignette_strength * self.intensity,
+            'perspective': self.perspective_strength * self.intensity,
+            'lens_softness': self.lens_softness * self.intensity,
+            # Chromatic
             'aberration': self.color_aberration * self.intensity,
             'color_noise': self.color_noise * self.intensity,
+            'purple_fringing': self.purple_fringing_intensity * self.intensity,
+            # Noise
+            'noise': self.noise_amount * self.intensity,
+            'vignette': self.vignette_strength * self.intensity,
+            # Smartphone processing
+            'oversharpening': self.oversharpening_amount * self.intensity,
+            'noise_reduction': self.noise_reduction_strength * self.intensity,
         }
 
 

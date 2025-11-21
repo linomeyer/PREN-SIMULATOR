@@ -1,251 +1,113 @@
-"""Camera simulation effects using OpenCV."""
-import cv2
+"""Camera simulation orchestrator using modular effects."""
 import numpy as np
-from typing import Tuple
+from typing import List
+
+from .effects import (
+    BarrelDistortionEffect,
+    PerspectiveDistortionEffect,
+    ChromaticAberrationEffect,
+    PurpleFringingEffect,
+    VignetteEffect,
+    OversharpeningEffect,
+    GaussianNoiseEffect,
+    ColorNoiseEffect,
+    SaltPepperNoiseEffect,
+    NoiseReductionEffect,
+    LensSoftnessEffect,
+    CameraEffect,
+)
 
 
 class CameraSimulator:
-    """Simulates RasPi Camera Module v3 artifacts and imperfections."""
+    """Orchestrates camera simulation effects in realistic pipeline order."""
 
     def __init__(
         self,
-        fisheye_strength: float = 0.15,
-        noise_amount: float = 0.03,
-        vignette_strength: float = 0.2,
-        color_aberration: float = 0.02,
-        color_noise: float = 0.01
+        fisheye_strength: float = 0.5,
+        perspective_strength: float = 0.4,
+        lens_softness: float = 0.5,
+        noise_amount: float = 0.25,
+        vignette_strength: float = 0.5,
+        color_aberration: float = 0.25,
+        color_noise: float = 0.35,
+        purple_fringing_intensity: float = 0.5,
+        oversharpening_amount: float = 1.5,
+        noise_reduction_strength: float = 0.5
     ):
         """
-        Initialize camera simulator.
+        Initialize camera simulator with effect pipeline.
 
         Args:
             fisheye_strength: Barrel distortion strength (0-1)
+            perspective_strength: Perspective distortion from camera angle (0-1)
+            lens_softness: Edge softness/blur (0-1)
             noise_amount: Gaussian + salt-pepper noise (0-1)
             vignette_strength: Radial lighting gradient (0-1)
             color_aberration: Chromatic aberration (0-1)
             color_noise: Color noise in BW scene (0-1)
+            purple_fringing_intensity: Purple fringing at edges (0-1)
+            oversharpening_amount: Aggressive software sharpening (0-2)
+            noise_reduction_strength: Detail loss from noise reduction (0-1)
         """
-        self.fisheye_strength = fisheye_strength
-        self.noise_amount = noise_amount
-        self.vignette_strength = vignette_strength
-        self.color_aberration = color_aberration
-        self.color_noise = color_noise
+        # Create effect pipeline in realistic order
+        # Order simulates cheap smartphone camera:
+        # 1. Optical distortions (lens) → 2. Chromatic effects →
+        # 3. Lighting → 4. Processing (sharpen) → 5. Sensor noise →
+        # 6. Processing (denoise) → 7. Final optical (softness)
 
-    def _apply_barrel_distortion(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply barrel (fisheye) distortion.
+        self.effects: List[CameraEffect] = [
+            # 1. Barrel distortion (fisheye) - lens optical effect
+            BarrelDistortionEffect(fisheye_strength),
 
-        Args:
-            image: Input image array
+            # 2. Perspective distortion - camera angle
+            PerspectiveDistortionEffect(perspective_strength),
 
-        Returns:
-            Distorted image
-        """
-        if self.fisheye_strength <= 0:
-            return image
+            # 3. Chromatic aberration - lens optical effect
+            ChromaticAberrationEffect(color_aberration),
 
-        h, w = image.shape[:2]
+            # 4. Purple fringing - cheap lens artifact at high-contrast edges
+            PurpleFringingEffect(purple_fringing_intensity),
 
-        # Create camera matrix
-        focal_length = w
-        center = (w / 2, h / 2)
-        camera_matrix = np.array([
-            [focal_length, 0, center[0]],
-            [0, focal_length, center[1]],
-            [0, 0, 1]
-        ], dtype=np.float32)
+            # 5. Vignette - lighting falloff
+            VignetteEffect(vignette_strength),
 
-        # Distortion coefficients (k1, k2, p1, p2, k3)
-        # Positive k1 creates barrel distortion
-        k1 = self.fisheye_strength * 0.5
-        dist_coeffs = np.array([k1, 0, 0, 0, 0], dtype=np.float32)
+            # 6. Oversharpening - aggressive software processing
+            OversharpeningEffect(oversharpening_amount),
 
-        # Apply distortion
-        distorted = cv2.undistort(image, camera_matrix, -dist_coeffs)
+            # 7. Gaussian noise - sensor noise
+            GaussianNoiseEffect(noise_amount),
 
-        return distorted
+            # 8. Color noise - color sensor imperfections
+            ColorNoiseEffect(color_noise),
 
-    def _apply_gaussian_noise(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply Gaussian noise.
+            # 9. Salt and pepper noise - dead/hot pixels
+            SaltPepperNoiseEffect(noise_amount, amount=0.002),
 
-        Args:
-            image: Input image array
+            # 10. Aggressive noise reduction - software artifact causing detail loss
+            NoiseReductionEffect(noise_reduction_strength),
 
-        Returns:
-            Noisy image
-        """
-        if self.noise_amount <= 0:
-            return image
-
-        # Generate Gaussian noise
-        noise = np.random.normal(0, self.noise_amount * 25, image.shape)
-
-        # Add noise
-        noisy = image.astype(np.float32) + noise
-        noisy = np.clip(noisy, 0, 255).astype(np.uint8)
-
-        return noisy
-
-    def _apply_salt_pepper_noise(self, image: np.ndarray, amount: float = 0.002) -> np.ndarray:
-        """
-        Apply salt and pepper noise.
-
-        Args:
-            image: Input image array
-            amount: Fraction of pixels to affect
-
-        Returns:
-            Noisy image
-        """
-        if self.noise_amount <= 0:
-            return image
-
-        output = image.copy()
-        num_salt = int(amount * self.noise_amount * image.size * 0.5)
-        num_pepper = int(amount * self.noise_amount * image.size * 0.5)
-
-        # Add salt (white pixels)
-        coords = [np.random.randint(0, i - 1, num_salt) for i in image.shape[:2]]
-        output[coords[0], coords[1], :] = 255
-
-        # Add pepper (black pixels)
-        coords = [np.random.randint(0, i - 1, num_pepper) for i in image.shape[:2]]
-        output[coords[0], coords[1], :] = 0
-
-        return output
-
-    def _apply_vignette(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply radial vignette effect (lighting gradient).
-
-        Args:
-            image: Input image array
-
-        Returns:
-            Image with vignette
-        """
-        if self.vignette_strength <= 0:
-            return image
-
-        h, w = image.shape[:2]
-
-        # Create radial gradient
-        center_x, center_y = w / 2, h / 2
-
-        # Create coordinate grids
-        y, x = np.ogrid[:h, :w]
-
-        # Calculate distance from center
-        dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
-
-        # Normalize to 0-1
-        max_dist = np.sqrt(center_x**2 + center_y**2)
-        dist = dist / max_dist
-
-        # Create vignette mask (darker at edges)
-        vignette = 1 - (dist ** 2) * self.vignette_strength
-
-        # Apply to image
-        vignette = vignette[:, :, np.newaxis]  # Add channel dimension
-        vignetted = (image.astype(np.float32) * vignette).astype(np.uint8)
-
-        return vignetted
-
-    def _apply_chromatic_aberration(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply chromatic aberration (color fringing).
-
-        Args:
-            image: Input image array (RGB)
-
-        Returns:
-            Image with chromatic aberration
-        """
-        if self.color_aberration <= 0:
-            return image
-
-        h, w = image.shape[:2]
-
-        # Split channels
-        b, g, r = cv2.split(image)
-
-        # Calculate shift amount (in pixels)
-        shift = int(self.color_aberration * 10)
-
-        if shift < 1:
-            return image
-
-        # Create transformation matrices for slight scaling/shifting
-        # Red channel: slightly expand
-        M_r = cv2.getRotationMatrix2D((w/2, h/2), 0, 1 + self.color_aberration * 0.01)
-        r_shifted = cv2.warpAffine(r, M_r, (w, h))
-
-        # Blue channel: slightly contract
-        M_b = cv2.getRotationMatrix2D((w/2, h/2), 0, 1 - self.color_aberration * 0.01)
-        b_shifted = cv2.warpAffine(b, M_b, (w, h))
-
-        # Merge channels
-        aberrated = cv2.merge([b_shifted, g, r_shifted])
-
-        return aberrated
-
-    def _apply_color_noise(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply color noise to simulate color camera capturing BW scene.
-
-        Args:
-            image: Input image array
-
-        Returns:
-            Image with color noise
-        """
-        if self.color_noise <= 0:
-            return image
-
-        # Generate color noise
-        noise = np.random.normal(0, self.color_noise * 15, image.shape)
-
-        # Apply noise
-        noisy = image.astype(np.float32) + noise
-        noisy = np.clip(noisy, 0, 255).astype(np.uint8)
-
-        return noisy
+            # 11. Lens softness - cheap lens quality, blurry edges
+            LensSoftnessEffect(lens_softness),
+        ]
 
     def simulate(self, image: np.ndarray) -> np.ndarray:
         """
-        Apply all camera simulation effects.
+        Apply all camera simulation effects in pipeline order.
 
         Args:
-            image: Input image array (H, W, 3) RGB
+            image: Input image array (H, W, 3) RGB uint8
 
         Returns:
-            Simulated camera image
+            Simulated camera image with all effects applied
         """
         # Ensure image is in correct format
         if image.dtype != np.uint8:
             image = image.astype(np.uint8)
 
-        # Apply effects in sequence
+        # Apply effects sequentially through pipeline
         result = image.copy()
-
-        # 1. Barrel distortion (fisheye)
-        result = self._apply_barrel_distortion(result)
-
-        # 2. Chromatic aberration
-        result = self._apply_chromatic_aberration(result)
-
-        # 3. Vignette
-        result = self._apply_vignette(result)
-
-        # 4. Gaussian noise
-        result = self._apply_gaussian_noise(result)
-
-        # 5. Salt and pepper noise
-        result = self._apply_salt_pepper_noise(result)
-
-        # 6. Color noise
-        result = self._apply_color_noise(result)
+        for effect in self.effects:
+            result = effect.apply(result)
 
         return result
 
@@ -261,9 +123,14 @@ class CameraSimulator:
             CameraSimulator instance
         """
         return cls(
-            fisheye_strength=config_params.get('fisheye', 0.15),
-            noise_amount=config_params.get('noise', 0.03),
-            vignette_strength=config_params.get('vignette', 0.2),
-            color_aberration=config_params.get('aberration', 0.02),
-            color_noise=config_params.get('color_noise', 0.01)
+            fisheye_strength=config_params.get('fisheye', 0.65),
+            perspective_strength=config_params.get('perspective', 0.45),
+            lens_softness=config_params.get('lens_softness', 0.6),
+            noise_amount=config_params.get('noise', 0.25),
+            vignette_strength=config_params.get('vignette', 0.5),
+            color_aberration=config_params.get('aberration', 0.25),
+            color_noise=config_params.get('color_noise', 0.35),
+            purple_fringing_intensity=config_params.get('purple_fringing', 0.75),
+            oversharpening_amount=config_params.get('oversharpening', 1.8),
+            noise_reduction_strength=config_params.get('noise_reduction', 0.7)
         )

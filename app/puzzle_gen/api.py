@@ -170,7 +170,12 @@ def render_clean_image(
         height=config.output.max_height,
         background_color=config.render.background_color,
         piece_color=config.render.piece_color,
-        background_noise=config.render.background_noise_intensity
+        background_noise=config.render.background_noise_intensity,
+        shadow_enabled=config.render.shadow_enabled,
+        shadow_offset_x=config.render.shadow_offset_x,
+        shadow_offset_y=config.render.shadow_offset_y,
+        shadow_blur_radius=config.render.shadow_blur_radius,
+        shadow_opacity=config.render.shadow_opacity
     )
 
     scale_factor = debug_info.get('scale_factor', 1.0)
@@ -225,7 +230,12 @@ def render_solution_image(
         height=config.output.max_height,
         background_color=config.render.background_color,
         piece_color=config.render.piece_color,
-        background_noise=config.render.background_noise_intensity
+        background_noise=config.render.background_noise_intensity,
+        shadow_enabled=config.render.shadow_enabled,
+        shadow_offset_x=config.render.shadow_offset_x,
+        shadow_offset_y=config.render.shadow_offset_y,
+        shadow_blur_radius=config.render.shadow_blur_radius,
+        shadow_opacity=config.render.shadow_opacity
     )
 
     # Render solution
@@ -266,7 +276,12 @@ def render_debug_image(
         height=config.output.max_height,
         background_color=config.render.background_color,
         piece_color=config.render.piece_color,
-        background_noise=config.render.background_noise_intensity
+        background_noise=config.render.background_noise_intensity,
+        shadow_enabled=config.render.shadow_enabled,
+        shadow_offset_x=config.render.shadow_offset_x,
+        shadow_offset_y=config.render.shadow_offset_y,
+        shadow_blur_radius=config.render.shadow_blur_radius,
+        shadow_opacity=config.render.shadow_opacity
     )
 
     debug_img = renderer.render_debug(pieces, debug_info)
