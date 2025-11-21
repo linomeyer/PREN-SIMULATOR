@@ -13,7 +13,7 @@ import random
 
 # All available cut types (13 variants)
 AVAILABLE_CUT_TYPES = [
-    'wavy',
+    #'wavy',
     'knob_square',
     'knob_triangular',
     'knob_wavy',
@@ -24,8 +24,8 @@ AVAILABLE_CUT_TYPES = [
     'double_chevron',
     'single_wave',
     'partial_wave',
-    'var_amp_increasing',
-    'var_amp_chaotic'
+    #'var_amp_increasing',
+    #'var_amp_chaotic'
 ]
 
 

@@ -377,7 +377,7 @@ class PartialWaveCut(Cut):
     """Hybrid cut: straight beginning, then waves, then straight end."""
 
     def __init__(self, is_male: bool, depth_ratio: float = 0.2,
-                 straight_ratio: float = 0.3, wave_count: int = 2):
+                 straight_ratio: float = 0.3, wave_count: int = 1):
         """
         Initialize partial wave cut.
 
@@ -641,7 +641,7 @@ class KnobRoundCut(Cut):
 class VariableAmplitudeIncreasingCut(Cut):
     """Sine wave with linearly increasing amplitude (Var Amp Stiigend)."""
 
-    def __init__(self, is_male: bool, depth_ratio: float = 0.2, wave_count: int = 2):
+    def __init__(self, is_male: bool, depth_ratio: float = 0.2, wave_count: int = 1):
         """
         Initialize increasing amplitude wave cut.
 
