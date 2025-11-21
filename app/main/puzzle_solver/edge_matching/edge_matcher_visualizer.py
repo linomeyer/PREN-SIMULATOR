@@ -1,12 +1,12 @@
 import os
-from typing import List, Tuple, Set
+from typing import List, Tuple
 
 import cv2
 import numpy as np
 
-from app.main.puzzle_solver.edge_detector import PieceEdge
-from app.main.puzzle_solver.edge_matcher import EdgeMatcher, EdgeMatch
-from app.main.puzzle_solver.extractor import PieceSegmenter
+from app.main.puzzle_solver.edge_detection.edge_detector import PieceEdge
+from app.main.puzzle_solver.edge_matching.edge_matcher import EdgeMatcher, EdgeMatch
+from app.main.puzzle_solver.piece_extraction.extractor import PieceSegmenter
 
 
 class MatchVisualizer:

@@ -1,16 +1,16 @@
-from flask import render_template, request, jsonify, send_file, session
+from flask import render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import os
 from pathlib import Path
 import cv2
 import numpy as np
 from app.main import main_bp
-from app.main.puzzle_solver.edge_matcher import EdgeMatcher
-from app.main.puzzle_solver.edge_matcher_visualizer import MatchVisualizer
-from app.main.puzzle_solver.extractor import PieceSegmenter
-from app.main.puzzle_solver.extractor_visualizer import PieceVisualizer
-from app.main.puzzle_solver.edge_detector import EdgeDetector
-from app.main.puzzle_solver.edge_detector_visualizer import EdgeVisualizer
+from app.main.puzzle_solver.edge_matching.edge_matcher import EdgeMatcher
+from app.main.puzzle_solver.edge_matching.edge_matcher_visualizer import MatchVisualizer
+from app.main.puzzle_solver.piece_extraction.extractor import PieceSegmenter
+from app.main.puzzle_solver.piece_extraction.extractor_visualizer import PieceVisualizer
+from app.main.puzzle_solver.edge_detection.edge_detector import EdgeDetector
+from app.main.puzzle_solver.edge_detection.edge_detector_visualizer import EdgeVisualizer
 
 # Get absolute base path (app/ directory)
 BASE_DIR = Path(__file__).resolve().parent.parent

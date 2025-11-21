@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from typing import List, Tuple, Dict
-from app.main.puzzle_solver.extractor import PuzzlePiece
+from app.main.puzzle_solver.piece_extraction.extractor import PuzzlePiece
 
 
 class PieceEdge:
