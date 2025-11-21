@@ -19,7 +19,7 @@ class PuzzleRenderer:
         background_color: Tuple[int, int, int] = (255, 255, 255),
         piece_color: Tuple[int, int, int] = (0, 0, 0),
         background_noise: float = 0.02,
-        shadow_enabled: bool = True,
+        shadow_enabled: bool = False,
         shadow_offset_x: int = 15,
         shadow_offset_y: int = 15,
         shadow_blur_radius: int = 20,
