@@ -23,16 +23,16 @@ class CameraSimulator:
 
     def __init__(
         self,
-        fisheye_strength: float = 0.5,
-        perspective_strength: float = 0.4,
-        lens_softness: float = 0.5,
-        noise_amount: float = 0.25,
-        vignette_strength: float = 0.5,
-        color_aberration: float = 0.25,
-        color_noise: float = 0.35,
-        purple_fringing_intensity: float = 0.5,
-        oversharpening_amount: float = 1.5,
-        noise_reduction_strength: float = 0.5
+        fisheye_strength: float = 0.1,          # 0.5
+        perspective_strength: float = 0.1,      # 0.4
+        lens_softness: float = 0.1,             # 0.5
+        noise_amount: float = 0.05,             # 0.25
+        vignette_strength: float = 0.1,         # 0.5
+        color_aberration: float = 0.05,         # 0.25
+        color_noise: float = 0.05,              # 0.35
+        purple_fringing_intensity: float = 0.1, # 0.5
+        oversharpening_amount: float = 0.1,     # 1.5
+        noise_reduction_strength: float = 0.1   # 0.5
     ):
         """
         Initialize camera simulator with effect pipeline.
