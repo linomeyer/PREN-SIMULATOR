@@ -191,10 +191,9 @@ def match_edges(filename):
         # Initialize edge matcher
         edge_matcher = EdgeMatcher(edge_detector)
 
-        # Find matches (by default, skip flat edges)
-        min_score = float(request.args.get('min_score', 0.6))
-        include_flat = request.args.get('include_flat', 'false').lower() == 'true'
-        matches = edge_matcher.find_matches(min_score=min_score, include_flat_edges=include_flat)
+        # Find unique best matches - one match per edge, no duplicates
+        min_score = float(request.args.get('min_score', 0.0))
+        matches = edge_matcher.find_unique_best_matches(min_score=min_score)
 
         # Get match statistics (includes border piece info)
         match_stats = edge_matcher.get_match_statistics()

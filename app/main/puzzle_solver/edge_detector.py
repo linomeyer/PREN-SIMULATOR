@@ -24,11 +24,69 @@ class PieceEdge:
         self.start_point = start_point
         self.end_point = end_point
         self.length = self._calculate_length()
+        self.angle = self._calculate_angle()  # NEW: Calculate edge angle
         self.shape_signature = self._compute_shape_signature()
 
     def _calculate_length(self) -> float:
         """Calculate the length of the edge."""
         return cv2.arcLength(self.points, False)
+
+    def _calculate_angle(self) -> float:
+        """
+        Calculate the angle of the edge baseline in degrees using PCA for robustness.
+        This is more accurate than just using start/end points.
+
+        Returns:
+            Angle in degrees (0-360), where 0° is pointing right (east)
+        """
+        points_2d = self.points.reshape(-1, 2).astype(np.float32)
+
+        # Use PCA to find the principal direction of the edge
+        # This is more robust than just using start/end points
+        if len(points_2d) >= 2:
+            # Calculate mean
+            mean = np.mean(points_2d, axis=0)
+
+            # Center the points
+            centered = points_2d - mean
+
+            # Compute covariance matrix
+            cov = np.cov(centered.T)
+
+            # Get eigenvalues and eigenvectors
+            eigenvalues, eigenvectors = np.linalg.eig(cov)
+
+            # The eigenvector with largest eigenvalue is the principal direction
+            principal_idx = np.argmax(eigenvalues)
+            principal_direction = eigenvectors[:, principal_idx]
+
+            # Calculate angle from principal direction
+            angle_rad = np.arctan2(principal_direction[1], principal_direction[0])
+            angle_deg = np.degrees(angle_rad)
+
+            # Normalize to 0-360 range
+            if angle_deg < 0:
+                angle_deg += 360
+
+            # Ensure direction consistency: angle should point from start to end
+            # Check if principal direction aligns with start->end direction
+            start_to_end = np.array(self.end_point) - np.array(self.start_point)
+            dot_product = np.dot(principal_direction, start_to_end)
+
+            # If directions are opposite, flip the angle
+            if dot_product < 0:
+                angle_deg = (angle_deg + 180.0) % 360.0
+
+            return angle_deg
+        else:
+            # Fallback to simple calculation if not enough points
+            dx = self.end_point[0] - self.start_point[0]
+            dy = self.end_point[1] - self.start_point[1]
+            angle_rad = np.arctan2(dy, dx)
+            angle_deg = np.degrees(angle_rad)
+            if angle_deg < 0:
+                angle_deg += 360
+            return angle_deg
 
     def _compute_shape_signature(self, num_samples: int = 50) -> np.ndarray:
         """
@@ -78,44 +136,78 @@ class PieceEdge:
     def get_edge_type_classification(self) -> str:
         """
         Classify the edge as flat, tab (out), or slot (in).
+        Uses multiple methods for robust classification.
 
         Returns:
             'flat', 'tab', or 'slot'
         """
         # Calculate deviation from straight line
-        start = np.array(self.start_point)
-        end = np.array(self.end_point)
+        start = np.array(self.start_point, dtype=np.float32)
+        end = np.array(self.end_point, dtype=np.float32)
 
         # Create straight line
         line_length = np.linalg.norm(end - start)
         if line_length == 0:
             return 'flat'
 
-        # Calculate maximum perpendicular distance from line
-        points_2d = self.points.reshape(-1, 2)
-        max_dist = 0
-        max_side = 0
+        points_2d = self.points.reshape(-1, 2).astype(np.float32)
 
+        # Method 1: Calculate perpendicular distances and area deviation
+        distances = []
         for point in points_2d:
             # Calculate perpendicular distance from point to line
-            # Using cross product method
             v1 = end - start
             v2 = point - start
             cross = np.cross(v1, v2)
-            dist = abs(cross) / line_length
+            dist = cross / line_length
+            distances.append(dist)
 
-            if dist > abs(max_dist):
-                # Determine which side of the line the point is on
-                side = np.sign(cross)
-                max_dist = dist
-                max_side = side
+        distances = np.array(distances)
 
-        # Threshold for classification (adjust based on your puzzle pieces)
-        threshold = line_length * 0.1  # 10% of edge length
+        # Calculate area under the curve (signed)
+        area = np.trapz(distances)
 
-        if max_dist < threshold:
+        # Calculate maximum absolute deviation
+        max_deviation = np.max(np.abs(distances))
+
+        # Method 2: Calculate the standard deviation of distances
+        std_deviation = np.std(distances)
+
+        # Method 3: Count significant deviations
+        # A flat edge should have very small deviations throughout
+        significant_threshold = line_length * 0.03  # 3% threshold for "significant"
+        significant_deviations = np.sum(np.abs(distances) > significant_threshold)
+        significant_ratio = significant_deviations / len(distances)
+
+        # Determine if it's flat based on multiple criteria
+        # An edge is flat if:
+        # 1. Maximum deviation is small (< 5% of line length)
+        # 2. Standard deviation is small
+        # 3. Few points deviate significantly
+        is_flat = (
+                max_deviation < line_length * 0.05 and  # Max deviation < 5%
+                std_deviation < line_length * 0.03 and  # Low variability
+                significant_ratio < 0.1  # Less than 10% points deviate
+        )
+
+        if is_flat:
             return 'flat'
-        elif max_side > 0:
+
+        # For non-flat edges, determine tab vs slot based on signed area
+        # Positive area = tab (protrusion), Negative area = slot (indentation)
+        # Use a weighted decision considering both area and max deviation location
+
+        # Find where maximum deviation occurs
+        max_idx = np.argmax(np.abs(distances))
+        max_dist_signed = distances[max_idx]
+
+        # Weight the decision: 70% on total area, 30% on max deviation
+        area_vote = np.sign(area)
+        max_vote = np.sign(max_dist_signed)
+
+        final_vote = 0.7 * area_vote + 0.3 * max_vote
+
+        if final_vote > 0:
             return 'tab'  # Protrusion
         else:
             return 'slot'  # Indentation

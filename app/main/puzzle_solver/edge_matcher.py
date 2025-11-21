@@ -1,9 +1,8 @@
 import cv2
 import numpy as np
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Set
 from dataclasses import dataclass
 from app.main.puzzle_solver.edge_detector import PieceEdge, EdgeDetector
-
 
 @dataclass
 class EdgeMatch:
@@ -14,12 +13,13 @@ class EdgeMatch:
     length_similarity: float
     shape_similarity: float
     classification_match: bool
-    rotation_offset: int  # How many 90-degree rotations needed for edge2 to align with edge1
+    rotation_offset: int  # Discrete 90° rotations for backward compatibility
+    rotation_angle: float  # NEW: Actual rotation angle in degrees
 
     def __repr__(self):
         return (f"EdgeMatch(piece_{self.edge1.piece_id}_{self.edge1.edge_type} <-> "
                 f"piece_{self.edge2.piece_id}_{self.edge2.edge_type}, "
-                f"score={self.compatibility_score:.3f}, rotation={self.rotation_offset * 90}°)")
+                f"score={self.compatibility_score:.3f}, rotation={self.rotation_angle:.1f}°)")
 
 
 class EdgeMatcher:
@@ -53,19 +53,20 @@ class EdgeMatcher:
         self.edge_detector = edge_detector
         self.matches: List[EdgeMatch] = []
 
-    def find_matches(self, min_score: float = 0.6, include_flat_edges: bool = False) -> List[EdgeMatch]:
+    def find_unique_best_matches(self, min_score: float = 0.0) -> List[EdgeMatch]:
         """
-        Find all potential edge matches above a minimum score threshold.
-        Considers all possible rotations of pieces.
+        Find unique best matches for all non-flat edges.
+        Each edge can only be used once. Eliminates duplicate matches.
+        Considers actual edge angles, not just 90° rotations.
 
         Args:
             min_score: Minimum compatibility score (0.0 to 1.0)
-            include_flat_edges: If False (default), skip matching flat edges (border pieces)
 
         Returns:
-            List of EdgeMatch objects sorted by score (best first)
+            List of unique EdgeMatch objects (no duplicates, one match per edge pair)
         """
-        self.matches = []
+        all_potential_matches = []
+        seen_edge_pairs: Set[Tuple[Tuple[int, str], Tuple[int, str]]] = set()
 
         # Get all edges organized by piece
         piece_edges = self.edge_detector.piece_edges
@@ -73,87 +74,127 @@ class EdgeMatcher:
         # Compare edges from different pieces
         for piece1_id, edges1 in piece_edges.items():
             for piece2_id, edges2 in piece_edges.items():
-                # Don't match edges from the same piece
-                if piece1_id == piece2_id:
+                # Only process each piece pair once (avoid A->B and B->A)
+                if piece1_id >= piece2_id:
                     continue
 
-                # Try all possible rotations of piece2
-                for rotation in range(4):
-                    matches_for_rotation = self._find_matches_with_rotation(
-                        piece1_id, edges1, piece2_id, edges2, rotation, min_score, include_flat_edges
-                    )
-                    self.matches.extend(matches_for_rotation)
+                # Compare all edges with angle-based alignment
+                matches_for_pair = self._find_matches_with_angles(
+                    piece1_id, edges1, piece2_id, edges2, min_score
+                )
+
+                # Filter out duplicate edge pairs
+                for match in matches_for_pair:
+                    edge1_key = (match.edge1.piece_id, match.edge1.edge_type)
+                    edge2_key = (match.edge2.piece_id, match.edge2.edge_type)
+
+                    # Create normalized pair (smaller piece_id first)
+                    edge_pair = tuple(sorted([edge1_key, edge2_key]))
+
+                    if edge_pair not in seen_edge_pairs:
+                        seen_edge_pairs.add(edge_pair)
+                        all_potential_matches.append(match)
 
         # Sort by compatibility score (best matches first)
-        self.matches.sort(key=lambda m: m.compatibility_score, reverse=True)
+        all_potential_matches.sort(key=lambda m: m.compatibility_score, reverse=True)
 
-        print(f"Found {len(self.matches)} potential matches (threshold: {min_score})")
-        return self.matches
+        print(f"Found {len(all_potential_matches)} unique potential matches (threshold: {min_score})")
 
-    def _find_matches_with_rotation(self, piece1_id: int, edges1: Dict[str, PieceEdge],
-                                    piece2_id: int, edges2: Dict[str, PieceEdge],
-                                    rotation: int, min_score: float,
-                                    include_flat_edges: bool) -> List[EdgeMatch]:
+        # Now select the best match for each edge, ensuring no edge is used twice
+        used_edges: Set[Tuple[int, str]] = set()
+        final_matches: List[EdgeMatch] = []
+
+        for match in all_potential_matches:
+            edge1_key = (match.edge1.piece_id, match.edge1.edge_type)
+            edge2_key = (match.edge2.piece_id, match.edge2.edge_type)
+
+            # Skip if either edge has already been matched
+            if edge1_key in used_edges or edge2_key in used_edges:
+                continue
+
+            # This is the best available match for these edges
+            final_matches.append(match)
+            used_edges.add(edge1_key)
+            used_edges.add(edge2_key)
+
+        print(f"Selected {len(final_matches)} best unique matches")
+        print(f"Matched {len(used_edges)} edges total")
+
+        # Update self.matches
+        self.matches = final_matches
+
+        return final_matches
+
+    def _find_matches_with_angles(self, piece1_id: int, edges1: Dict[str, PieceEdge],
+                                  piece2_id: int, edges2: Dict[str, PieceEdge],
+                                  min_score: float) -> List[EdgeMatch]:
         """
-        Find matches between two pieces with piece2 rotated by the given amount.
+        Find matches between two pieces considering actual edge angles.
+
+        For two edges to match, they should be approximately opposite in direction
+        (180° apart) when placed adjacent to each other.
 
         Args:
             piece1_id: ID of first piece
             edges1: Edges of first piece
             piece2_id: ID of second piece
             edges2: Edges of second piece
-            rotation: Number of 90° clockwise rotations (0-3)
             min_score: Minimum compatibility score
-            include_flat_edges: If False, skip flat edges
 
         Returns:
             List of EdgeMatch objects
         """
         matches = []
+        angle_tolerance = 10.0  # Tightened to 10° deviation for matching
 
         # For each edge of piece1
         for edge1_type, edge1 in edges1.items():
-            # Skip flat edges if requested (they are border pieces)
-            if not include_flat_edges and edge1.get_edge_type_classification() == 'flat':
+            edge1_classification = edge1.get_edge_type_classification()
+
+            # Skip flat edges
+            if edge1_classification == 'flat':
                 continue
 
-            # Determine which edge of piece2 should be adjacent
-            adjacent_edge_type = self.ADJACENT_EDGES[edge1_type]
+            # For each edge of piece2
+            for edge2_type, edge2 in edges2.items():
+                edge2_classification = edge2.get_edge_type_classification()
 
-            # Find which edge of the rotated piece2 corresponds to this adjacent edge
-            # We need to reverse-map: after rotation, which original edge becomes adjacent_edge_type?
-            rotated_edges = self.ROTATION_MAP[rotation]
-
-            # Find which original edge becomes the adjacent edge after rotation
-            original_edge_type = None
-            for orig, rotated in rotated_edges.items():
-                if rotated == adjacent_edge_type:
-                    original_edge_type = orig
-                    break
-
-            if original_edge_type and original_edge_type in edges2:
-                edge2 = edges2[original_edge_type]
-
-                # Skip flat edges if requested
-                if not include_flat_edges and edge2.get_edge_type_classification() == 'flat':
+                # Skip flat edges
+                if edge2_classification == 'flat':
                     continue
 
-                # Evaluate match
-                match = self._evaluate_match(edge1, edge2, rotation)
+                # Only compare complementary edges (tab with slot)
+                if not self._are_complementary_edges(edge1_classification, edge2_classification):
+                    continue
 
-                if match.compatibility_score >= min_score:
-                    matches.append(match)
+                # Calculate required rotation for alignment
+                # Two edges should be opposite (180° apart) to fit together
+                angle_diff = self._calculate_angle_difference(edge1.angle, edge2.angle)
+
+                # Check if edges are approximately opposite (around 180°)
+                is_opposite = abs(angle_diff - 180.0) < angle_tolerance
+
+                if is_opposite:
+                    # Calculate the exact rotation needed
+                    rotation_angle = self._normalize_angle(edge2.angle - edge1.angle + 180.0)
+
+                    # Evaluate match with actual rotation angle
+                    match = self._evaluate_match_with_angle(edge1, edge2, rotation_angle)
+
+                    if match.compatibility_score >= min_score:
+                        matches.append(match)
 
         return matches
 
-    def _evaluate_match(self, edge1: PieceEdge, edge2: PieceEdge, rotation: int) -> EdgeMatch:
+    def _evaluate_match_with_angle(self, edge1: PieceEdge, edge2: PieceEdge,
+                                   rotation_angle: float) -> EdgeMatch:
         """
-        Evaluate the compatibility between two edges with a specific rotation.
+        Evaluate the compatibility between two edges with a specific rotation angle.
 
         Args:
             edge1: First edge
-            edge2: Second edge (will be conceptually rotated)
-            rotation: Number of 90° rotations applied to piece containing edge2
+            edge2: Second edge
+            rotation_angle: Actual rotation angle in degrees
 
         Returns:
             EdgeMatch object with compatibility scores
@@ -164,16 +205,24 @@ class EdgeMatcher:
         # 2. Shape similarity (compare shape signatures)
         shape_similarity = self._calculate_shape_similarity(edge1, edge2)
 
-        # 3. Classification match (tab should match with slot, flat with flat)
+        # 3. Classification match (tab should match with slot)
         classification_match = self._check_classification_compatibility(edge1, edge2)
         classification_score = 1.0 if classification_match else 0.0
 
-        # 4. Calculate overall compatibility score (weighted average)
+        # 4. Angle alignment bonus - reward closer angle matches
+        angle_diff = abs(self._calculate_angle_difference(edge1.angle, edge2.angle) - 180.0)
+        angle_similarity = max(0.0, 1.0 - (angle_diff / 10.0))  # Linear falloff over 10°
+
+        # 5. Calculate overall compatibility score (weighted average)
         compatibility_score = (
-                0.3 * length_similarity +
-                0.5 * shape_similarity +
-                0.2 * classification_score
+                0.25 * length_similarity +
+                0.45 * shape_similarity +
+                0.15 * classification_score +
+                0.15 * angle_similarity  # NEW: Angle alignment component
         )
+
+        # Convert rotation angle to nearest 90° step for backward compatibility
+        rotation_offset = int(round(rotation_angle / 90.0)) % 4
 
         return EdgeMatch(
             edge1=edge1,
@@ -182,8 +231,68 @@ class EdgeMatcher:
             length_similarity=length_similarity,
             shape_similarity=shape_similarity,
             classification_match=classification_match,
-            rotation_offset=rotation
+            rotation_offset=rotation_offset,
+            rotation_angle=rotation_angle  # Store actual angle
         )
+
+    def _calculate_angle_difference(self, angle1: float, angle2: float) -> float:
+        """
+        Calculate the absolute difference between two angles (0-360°).
+
+        Args:
+            angle1: First angle in degrees
+            angle2: Second angle in degrees
+
+        Returns:
+            Absolute angle difference (0-180°)
+        """
+        diff = abs(angle1 - angle2)
+
+        # Normalize to 0-180 range (take shorter angle)
+        if diff > 180:
+            diff = 360 - diff
+
+        return diff
+
+    def _normalize_angle(self, angle: float) -> float:
+        """
+        Normalize angle to 0-360 range.
+
+        Args:
+            angle: Angle in degrees
+
+        Returns:
+            Normalized angle (0-360°)
+        """
+        angle = angle % 360
+        if angle < 0:
+            angle += 360
+        return angle
+
+
+    def _are_complementary_edges(self, class1: str, class2: str) -> bool:
+        """
+        Check if two edge classifications are complementary (can fit together).
+
+        Args:
+            class1: Classification of first edge ('flat', 'tab', or 'slot')
+            class2: Classification of second edge ('flat', 'tab', or 'slot')
+
+        Returns:
+            True if edges can fit together, False otherwise
+        """
+        # Tab fits with slot, slot fits with tab
+        if (class1 == 'tab' and class2 == 'slot') or (class1 == 'slot' and class2 == 'tab'):
+            return True
+
+        # Flat edges can match with flat edges (border pieces)
+        if class1 == 'flat' and class2 == 'flat':
+            return True
+
+        # All other combinations cannot fit
+        # (tab-tab, slot-slot, tab-flat, slot-flat, etc.)
+        return False
+
 
     def _calculate_length_similarity(self, edge1: PieceEdge, edge2: PieceEdge) -> float:
         """
@@ -273,9 +382,10 @@ class EdgeMatcher:
         Check if edge classifications are compatible.
 
         Compatible pairs:
-        - flat <-> flat
         - tab <-> slot
         - slot <-> tab
+
+        Flat edges should NOT match with anything (they are borders).
 
         Args:
             edge1: First edge
@@ -287,9 +397,9 @@ class EdgeMatcher:
         class1 = edge1.get_edge_type_classification()
         class2 = edge2.get_edge_type_classification()
 
-        # Flat edges match with flat edges
-        if class1 == 'flat' and class2 == 'flat':
-            return True
+        # Flat edges should never match - they are border pieces
+        if class1 == 'flat' or class2 == 'flat':
+            return False
 
         # Tab matches with slot
         if (class1 == 'tab' and class2 == 'slot') or (class1 == 'slot' and class2 == 'tab'):
@@ -297,75 +407,13 @@ class EdgeMatcher:
 
         return False
 
-    def get_matches_for_piece(self, piece_id: int, min_score: float = 0.6) -> Dict[str, List[EdgeMatch]]:
-        """
-        Get all matches for a specific piece, organized by edge type.
-
-        Args:
-            piece_id: ID of the piece
-            min_score: Minimum compatibility score
-
-        Returns:
-            Dictionary mapping edge type to list of matches
-        """
-        if not self.matches:
-            self.find_matches(min_score)
-
-        piece_matches = {'top': [], 'right': [], 'bottom': [], 'left': []}
-
-        for match in self.matches:
-            if match.edge1.piece_id == piece_id:
-                piece_matches[match.edge1.edge_type].append(match)
-            elif match.edge2.piece_id == piece_id:
-                # Determine which edge type after rotation
-                rotated_edge_type = self.ROTATION_MAP[match.rotation_offset][match.edge2.edge_type]
-                piece_matches[rotated_edge_type].append(match)
-
-        return piece_matches
-
-    def get_best_match_for_edge(self, piece_id: int, edge_type: str) -> Optional[EdgeMatch]:
-        """
-        Get the best match for a specific edge.
-
-        Args:
-            piece_id: ID of the piece
-            edge_type: Type of edge ('top', 'right', 'bottom', 'left')
-
-        Returns:
-            Best EdgeMatch or None if no matches found
-        """
-        if not self.matches:
-            self.find_matches()
-
-        best_match = None
-        best_score = 0.0
-
-        for match in self.matches:
-            if match.edge1.piece_id == piece_id and match.edge1.edge_type == edge_type:
-                if match.compatibility_score > best_score:
-                    best_match = match
-                    best_score = match.compatibility_score
-            elif match.edge2.piece_id == piece_id:
-                rotated_edge_type = self.ROTATION_MAP[match.rotation_offset][match.edge2.edge_type]
-                if rotated_edge_type == edge_type and match.compatibility_score > best_score:
-                    best_match = match
-                    best_score = match.compatibility_score
-
-        return best_match
-
 
     def identify_border_pieces(self) -> Dict[int, Dict[str, any]]:
         """
         Identify border and corner pieces based on flat edges.
 
         Returns:
-            Dictionary mapping piece_id to border information:
-            {
-                'is_border': bool,
-                'is_corner': bool,
-                'flat_edges': list of edge types that are flat,
-                'num_flat_edges': int
-            }
+            Dictionary mapping piece_id to border information
         """
         border_info = {}
 
@@ -387,45 +435,8 @@ class EdgeMatcher:
 
         return border_info
 
-    def get_corner_pieces(self) -> List[int]:
-        """
-        Get IDs of corner pieces (pieces with 2 or more flat edges).
-
-        Returns:
-            List of piece IDs that are corner pieces
-        """
-        border_info = self.identify_border_pieces()
-        return [piece_id for piece_id, info in border_info.items() if info['is_corner']]
-
-    def get_border_pieces(self) -> List[int]:
-        """
-        Get IDs of border pieces (pieces with at least 1 flat edge).
-
-        Returns:
-            List of piece IDs that are border pieces
-        """
-        border_info = self.identify_border_pieces()
-        return [piece_id for piece_id, info in border_info.items() if info['is_border']]
-
-    def get_interior_pieces(self) -> List[int]:
-        """
-        Get IDs of interior pieces (pieces with no flat edges).
-
-        Returns:
-            List of piece IDs that are interior pieces
-        """
-        border_info = self.identify_border_pieces()
-        return [piece_id for piece_id, info in border_info.items() if not info['is_border']]
-
-
-
     def get_match_statistics(self) -> Dict:
-        """
-        Get statistics about the matches.
-
-        Returns:
-            Dictionary with match statistics
-        """
+        """Get statistics about the matches."""
         if not self.matches:
             return {}
 
