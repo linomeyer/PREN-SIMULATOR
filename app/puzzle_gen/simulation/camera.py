@@ -11,11 +11,13 @@ from .effects import (
     OversharpeningEffect,
     GaussianNoiseEffect,
     ColorNoiseEffect,
+    CombinedNoiseEffect,
     SaltPepperNoiseEffect,
     NoiseReductionEffect,
     LensSoftnessEffect,
     CameraEffect,
 )
+from ..performance import timed, time_block
 
 
 class CameraSimulator:
@@ -32,7 +34,8 @@ class CameraSimulator:
         color_noise: float = 0.05,              # 0.35
         purple_fringing_intensity: float = 0.1, # 0.5
         oversharpening_amount: float = 0.1,     # 1.5
-        noise_reduction_strength: float = 0.1   # 0.5
+        noise_reduction_strength: float = 0.1,  # 0.5
+        use_optimized_noise: bool = True        # Use combined noise effect
     ):
         """
         Initialize camera simulator with effect pipeline.
@@ -48,12 +51,28 @@ class CameraSimulator:
             purple_fringing_intensity: Purple fringing at edges (0-1)
             oversharpening_amount: Aggressive software sharpening (0-2)
             noise_reduction_strength: Detail loss from noise reduction (0-1)
+            use_optimized_noise: Use combined noise effect (faster)
         """
         # Create effect pipeline in realistic order
         # Order simulates cheap smartphone camera:
         # 1. Optical distortions (lens) → 2. Chromatic effects →
         # 3. Lighting → 4. Processing (sharpen) → 5. Sensor noise →
         # 6. Processing (denoise) → 7. Final optical (softness)
+
+        # Build noise effects based on optimization flag
+        if use_optimized_noise:
+            # Use combined noise effect (faster - one RNG call)
+            noise_effects = [
+                CombinedNoiseEffect(noise_amount, color_noise),
+                SaltPepperNoiseEffect(noise_amount, amount=0.002),
+            ]
+        else:
+            # Use separate noise effects (original)
+            noise_effects = [
+                GaussianNoiseEffect(noise_amount),
+                ColorNoiseEffect(color_noise),
+                SaltPepperNoiseEffect(noise_amount, amount=0.002),
+            ]
 
         self.effects: List[CameraEffect] = [
             # 1. Barrel distortion (fisheye) - lens optical effect
@@ -74,14 +93,8 @@ class CameraSimulator:
             # 6. Oversharpening - aggressive software processing
             OversharpeningEffect(oversharpening_amount),
 
-            # 7. Gaussian noise - sensor noise
-            GaussianNoiseEffect(noise_amount),
-
-            # 8. Color noise - color sensor imperfections
-            ColorNoiseEffect(color_noise),
-
-            # 9. Salt and pepper noise - dead/hot pixels
-            SaltPepperNoiseEffect(noise_amount, amount=0.002),
+            # 7-9. Noise effects (optimized or separate)
+            *noise_effects,
 
             # 10. Aggressive noise reduction - software artifact causing detail loss
             NoiseReductionEffect(noise_reduction_strength),
@@ -90,6 +103,7 @@ class CameraSimulator:
             LensSoftnessEffect(lens_softness),
         ]
 
+    @timed
     def simulate(self, image: np.ndarray) -> np.ndarray:
         """
         Apply all camera simulation effects in pipeline order.
@@ -107,17 +121,20 @@ class CameraSimulator:
         # Apply effects sequentially through pipeline
         result = image.copy()
         for effect in self.effects:
-            result = effect.apply(result)
+            effect_name = effect.__class__.__name__
+            with time_block(f"CameraEffect.{effect_name}"):
+                result = effect.apply(result)
 
         return result
 
     @classmethod
-    def from_config(cls, config_params: dict) -> 'CameraSimulator':
+    def from_config(cls, config_params: dict, use_optimized_noise: bool = True) -> 'CameraSimulator':
         """
         Create simulator from configuration dictionary.
 
         Args:
             config_params: Dictionary with effect parameters
+            use_optimized_noise: Use combined noise effect (faster)
 
         Returns:
             CameraSimulator instance
@@ -132,5 +149,6 @@ class CameraSimulator:
             color_noise=config_params.get('color_noise', 0.35),
             purple_fringing_intensity=config_params.get('purple_fringing', 0.75),
             oversharpening_amount=config_params.get('oversharpening', 1.8),
-            noise_reduction_strength=config_params.get('noise_reduction', 0.7)
+            noise_reduction_strength=config_params.get('noise_reduction', 0.7),
+            use_optimized_noise=use_optimized_noise
         )

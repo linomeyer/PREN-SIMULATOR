@@ -18,6 +18,7 @@ from .chromatic import (
 
 # Noise effects
 from .noise import (
+    CombinedNoiseEffect,
     GaussianNoiseEffect,
     SaltPepperNoiseEffect,
 )
@@ -45,6 +46,7 @@ __all__ = [
     'PurpleFringingEffect',
     'ColorNoiseEffect',
     # Noise
+    'CombinedNoiseEffect',
     'GaussianNoiseEffect',
     'SaltPepperNoiseEffect',
     # Geometric

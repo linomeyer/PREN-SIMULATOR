@@ -5,6 +5,7 @@ from app.puzzle_gen.config import (
     GeneratorConfig, PuzzleConfig, RenderConfig,
     CameraConfig, OutputConfig, Layout
 )
+from app.puzzle_gen.performance import print_performance_report
 from PIL import Image
 import io
 import base64
@@ -73,6 +74,7 @@ def generate():
 
         apply_watermark = data.get('apply_watermark', True)
         camera_intensity = data.get('camera_intensity', 1.0)
+        enable_perf_logging = data.get('enable_performance_logging', False)
 
         # Validate layout
         if layout_str not in ['2x3', '3x2']:
@@ -100,6 +102,9 @@ def generate():
             )
         )
 
+        # Set performance logging flag
+        GeneratorConfig.enable_performance_logging = enable_perf_logging
+
         # Generate puzzle
         result = generate_puzzle_images(
             config=config,
@@ -109,6 +114,9 @@ def generate():
             apply_camera=True,
             include_debug=False
         )
+
+        # Print performance report if enabled
+        print_performance_report()
 
         # Convert images to base64
         def array_to_base64(img_array):

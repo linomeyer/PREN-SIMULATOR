@@ -83,6 +83,7 @@ class RenderConfig:
     shadow_offset_y: int = 30  # Shadow offset in Y direction (pixels) - INCREASED
     shadow_blur_radius: int = 35  # Gaussian blur radius for soft shadows - INCREASED
     shadow_opacity: float = 0.7  # Shadow opacity (0-1) - INCREASED
+    shadow_render_scale: float = 0.5  # Scale for shadow rendering (0.25-1.0, lower=faster)
 
     # Cut parameters
     cut_depth_ratio: float = 0.075  # Cut depth as ratio of edge length (5-10%)
@@ -94,6 +95,9 @@ class CameraConfig:
     """Configuration for camera simulation effects (cheap smartphone camera - EXTREME MODE)."""
     # Overall intensity control (0-1, where 1 is realistic cheap smartphone)
     intensity: float = 1.0
+
+    # Performance optimization
+    use_optimized_noise: bool = True  # Use combined noise effect (faster)
 
     # Distortions - DRAMATICALLY INCREASED
     fisheye_strength: float = 0.65  # Barrel distortion strength (EXTREME: was 0.35)
@@ -165,3 +169,7 @@ class GeneratorConfig:
     render: RenderConfig = field(default_factory=RenderConfig)
     camera: CameraConfig = field(default_factory=CameraConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+
+
+# Performance monitoring global flag (outside dataclass to make it a true class variable)
+GeneratorConfig.enable_performance_logging = False
