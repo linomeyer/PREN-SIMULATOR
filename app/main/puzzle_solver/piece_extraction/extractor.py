@@ -24,11 +24,40 @@ class PuzzlePiece:
 
 class PieceSegmenter:
 
-    def __init__(self, image_path: str):
-        self.image = cv2.imread(image_path)
-        if self.image is None:
-            raise ValueError(f"Could not load image from {image_path}")
-        self.image_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+    # Configurable segmentation parameters
+    BLUR_KERNEL_SIZE = 7  # Gaussian blur kernel size (was hardcoded 5)
+    MORPH_KERNEL_SIZE = 5  # Morphological operations kernel size (was hardcoded 3)
+    MORPH_CLOSE_ITERATIONS = 3  # Closing iterations to fill gaps (was hardcoded 2)
+    MORPH_OPEN_ITERATIONS = 1  # Opening iterations to remove noise
+
+    def __init__(self, image_path: str = None, image_array: np.ndarray = None,
+                 blur_kernel: int = None,
+                 morph_kernel: int = None,
+                 morph_close_iter: int = None,
+                 morph_open_iter: int = None):
+        if image_array is not None:
+            # Use provided numpy array
+            self.image = image_array
+            if len(self.image.shape) == 3 and self.image.shape[2] == 3:
+                # Assume BGR format if 3 channels
+                self.image_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+            else:
+                self.image_rgb = self.image
+        elif image_path is not None:
+            # Load from file path
+            self.image = cv2.imread(image_path)
+            if self.image is None:
+                raise ValueError(f"Could not load image from {image_path}")
+            self.image_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+        else:
+            raise ValueError("Either image_path or image_array must be provided")
+
+        # Store segmentation parameters (use provided or defaults)
+        self.blur_kernel = blur_kernel if blur_kernel is not None else self.BLUR_KERNEL_SIZE
+        self.morph_kernel = morph_kernel if morph_kernel is not None else self.MORPH_KERNEL_SIZE
+        self.morph_close_iter = morph_close_iter if morph_close_iter is not None else self.MORPH_CLOSE_ITERATIONS
+        self.morph_open_iter = morph_open_iter if morph_open_iter is not None else self.MORPH_OPEN_ITERATIONS
+
         self.pieces: List[PuzzlePiece] = []
 
     def segment_pieces(self, min_area: int = 1000, max_area: int = None) -> List[PuzzlePiece]:
@@ -38,16 +67,16 @@ class PieceSegmenter:
         # remove color
         gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
-        # noise reduction
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        # noise reduction (configurable kernel size)
+        blurred = cv2.GaussianBlur(gray, (self.blur_kernel, self.blur_kernel), 0)
 
         # background separation threshold
         _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-        # clean up
-        kernel = np.ones((3, 3), np.uint8)
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
+        # clean up (configurable kernel and iterations)
+        kernel = np.ones((self.morph_kernel, self.morph_kernel), np.uint8)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=self.morph_close_iter)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=self.morph_open_iter)
 
         # find contours
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

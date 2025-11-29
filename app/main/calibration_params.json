@@ -1,0 +1,44 @@
+{
+  "calibration_date": "2025-11-28T19:57:41.650962",
+  "image_shape": [
+    2592,
+    4608
+  ],
+  "barrel_distortion": {
+    "k1": 0.0005548189901170332,
+    "k2": -0.0034416545726424367,
+    "k3": 0.006443160026823271,
+    "fx": 4608.0,
+    "fy": 4608.0,
+    "cx": 2304.0,
+    "cy": 1296.0,
+    "image_size": [
+      4608,
+      2592
+    ]
+  },
+  "perspective": {
+    "enabled": false,
+    "transform_matrix": null
+  },
+  "vignette": {
+    "strength": 0.2,
+    "enabled": true,
+    "center": [
+      2304.0,
+      1296.0
+    ],
+    "radius": 2304.0
+  },
+  "chromatic_aberration": {
+    "enabled": false,
+    "r_offset": [
+      0,
+      0
+    ],
+    "b_offset": [
+      0,
+      0
+    ]
+  }
+}

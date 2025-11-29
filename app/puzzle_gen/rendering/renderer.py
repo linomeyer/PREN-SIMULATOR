@@ -24,8 +24,11 @@ class PuzzleRenderer:
         shadow_offset_x: int = 15,
         shadow_offset_y: int = 15,
         shadow_blur_radius: int = 20,
-        shadow_opacity: float = 0.4,
-        shadow_render_scale: float = 0.5
+        shadow_opacity: float = 0.2,
+        shadow_render_scale: float = 0.5,
+        grid_spacing_px: float = 236.0,
+        grid_line_thickness: int = 1,
+        grid_line_color: Tuple[int, int, int] = (200, 200, 200)
     ):
         """
         Initialize renderer.
@@ -42,6 +45,9 @@ class PuzzleRenderer:
             shadow_blur_radius: Gaussian blur radius for soft shadows
             shadow_opacity: Shadow opacity (0-1)
             shadow_render_scale: Scale for shadow rendering (0.25-1.0, lower=faster)
+            grid_spacing_px: Calibration grid spacing in pixels
+            grid_line_thickness: Calibration grid line thickness in pixels
+            grid_line_color: RGB color for calibration grid lines
         """
         self.width = width
         self.height = height
@@ -54,14 +60,17 @@ class PuzzleRenderer:
         self.shadow_blur_radius = shadow_blur_radius
         self.shadow_opacity = shadow_opacity
         self.shadow_render_scale = max(0.25, min(1.0, shadow_render_scale))  # Clamp to valid range
+        self.grid_spacing_px = grid_spacing_px
+        self.grid_line_thickness = grid_line_thickness
+        self.grid_line_color = grid_line_color
 
     @timed
     def _create_background(self) -> Image.Image:
         """
-        Create background with subtle texture.
+        Create background with subtle texture and calibration grid.
 
         Returns:
-            PIL Image with textured background
+            PIL Image with textured background and grid
         """
         # Create base background
         img = Image.new('RGB', (self.width, self.height), self.background_color)
@@ -78,6 +87,46 @@ class PuzzleRenderer:
             img_array = np.clip(img_array, 0, 255).astype(np.uint8)
 
             img = Image.fromarray(img_array)
+
+        # Draw calibration grid
+        img = self._draw_calibration_grid(img)
+
+        return img
+
+    def _draw_calibration_grid(self, img: Image.Image) -> Image.Image:
+        """
+        Draw calibration grid on background image.
+
+        The grid is drawn BEFORE barrel distortion is applied, so the distortion
+        can be measured and calibrated from the curved grid lines.
+
+        Args:
+            img: Background image to draw grid on
+
+        Returns:
+            Image with grid drawn
+        """
+        draw = ImageDraw.Draw(img)
+
+        # Draw vertical lines
+        x = self.grid_spacing_px
+        while x < self.width:
+            draw.line(
+                [(x, 0), (x, self.height)],
+                fill=self.grid_line_color,
+                width=self.grid_line_thickness
+            )
+            x += self.grid_spacing_px
+
+        # Draw horizontal lines
+        y = self.grid_spacing_px
+        while y < self.height:
+            draw.line(
+                [(0, y), (self.width, y)],
+                fill=self.grid_line_color,
+                width=self.grid_line_thickness
+            )
+            y += self.grid_spacing_px
 
         return img
 

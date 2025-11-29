@@ -274,7 +274,7 @@
             border-bottom: 3px solid #fff;
             border-radius: 10px;
             position: sticky;
-            top: 100px;
+            top: 150px;
             z-index: 90;
             background-color: rgba(250, 250, 255, 0.3);
             backdrop-filter: blur(8px);

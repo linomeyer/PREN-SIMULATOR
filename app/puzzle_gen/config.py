@@ -82,12 +82,17 @@ class RenderConfig:
     shadow_offset_x: int = 30  # Shadow offset in X direction (pixels) - INCREASED
     shadow_offset_y: int = 30  # Shadow offset in Y direction (pixels) - INCREASED
     shadow_blur_radius: int = 35  # Gaussian blur radius for soft shadows - INCREASED
-    shadow_opacity: float = 0.7  # Shadow opacity (0-1) - INCREASED
+    shadow_opacity: float = 0.6  # Shadow opacity (0-1) - INCREASED
     shadow_render_scale: float = 0.5  # Scale for shadow rendering (0.25-1.0, lower=faster)
 
     # Cut parameters
     cut_depth_ratio: float = 0.075  # Cut depth as ratio of edge length (5-10%)
     wave_frequency: int = 2  # Number of waves for wavy cuts
+
+    # Calibration grid (always enabled)
+    grid_spacing_mm: float = 20.0  # Grid spacing in millimeters
+    grid_line_thickness: int = 1  # Grid line thickness in pixels
+    grid_line_color: Tuple[int, int, int] = (200, 200, 200)  # Light gray
 
 
 @dataclass
