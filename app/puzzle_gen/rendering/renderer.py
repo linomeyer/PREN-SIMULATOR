@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFilter
 import numpy as np
 
 from ..geometry.puzzle import PuzzlePiece
+from ..performance import timed
 
 
 class PuzzleRenderer:
@@ -23,7 +24,11 @@ class PuzzleRenderer:
         shadow_offset_x: int = 15,
         shadow_offset_y: int = 15,
         shadow_blur_radius: int = 20,
-        shadow_opacity: float = 0.4
+        shadow_opacity: float = 0.2,
+        shadow_render_scale: float = 0.5,
+        grid_spacing_px: float = 236.0,
+        grid_line_thickness: int = 1,
+        grid_line_color: Tuple[int, int, int] = (200, 200, 200)
     ):
         """
         Initialize renderer.
@@ -39,6 +44,10 @@ class PuzzleRenderer:
             shadow_offset_y: Shadow offset in Y direction (pixels)
             shadow_blur_radius: Gaussian blur radius for soft shadows
             shadow_opacity: Shadow opacity (0-1)
+            shadow_render_scale: Scale for shadow rendering (0.25-1.0, lower=faster)
+            grid_spacing_px: Calibration grid spacing in pixels
+            grid_line_thickness: Calibration grid line thickness in pixels
+            grid_line_color: RGB color for calibration grid lines
         """
         self.width = width
         self.height = height
@@ -50,13 +59,18 @@ class PuzzleRenderer:
         self.shadow_offset_y = shadow_offset_y
         self.shadow_blur_radius = shadow_blur_radius
         self.shadow_opacity = shadow_opacity
+        self.shadow_render_scale = max(0.25, min(1.0, shadow_render_scale))  # Clamp to valid range
+        self.grid_spacing_px = grid_spacing_px
+        self.grid_line_thickness = grid_line_thickness
+        self.grid_line_color = grid_line_color
 
+    @timed
     def _create_background(self) -> Image.Image:
         """
-        Create background with subtle texture.
+        Create background with subtle texture and calibration grid.
 
         Returns:
-            PIL Image with textured background
+            PIL Image with textured background and grid
         """
         # Create base background
         img = Image.new('RGB', (self.width, self.height), self.background_color)
@@ -73,6 +87,46 @@ class PuzzleRenderer:
             img_array = np.clip(img_array, 0, 255).astype(np.uint8)
 
             img = Image.fromarray(img_array)
+
+        # Draw calibration grid
+        img = self._draw_calibration_grid(img)
+
+        return img
+
+    def _draw_calibration_grid(self, img: Image.Image) -> Image.Image:
+        """
+        Draw calibration grid on background image.
+
+        The grid is drawn BEFORE barrel distortion is applied, so the distortion
+        can be measured and calibrated from the curved grid lines.
+
+        Args:
+            img: Background image to draw grid on
+
+        Returns:
+            Image with grid drawn
+        """
+        draw = ImageDraw.Draw(img)
+
+        # Draw vertical lines
+        x = self.grid_spacing_px
+        while x < self.width:
+            draw.line(
+                [(x, 0), (x, self.height)],
+                fill=self.grid_line_color,
+                width=self.grid_line_thickness
+            )
+            x += self.grid_spacing_px
+
+        # Draw horizontal lines
+        y = self.grid_spacing_px
+        while y < self.height:
+            draw.line(
+                [(0, y), (self.width, y)],
+                fill=self.grid_line_color,
+                width=self.grid_line_thickness
+            )
+            y += self.grid_spacing_px
 
         return img
 
@@ -108,6 +162,7 @@ class PuzzleRenderer:
         # Translate back
         return (x_rot + center[0], y_rot + center[1])
 
+    @timed
     def _transform_piece_points(
         self,
         piece: PuzzlePiece,
@@ -157,6 +212,7 @@ class PuzzleRenderer:
 
         return transformed_points
 
+    @timed
     def _render_shadow(
         self,
         piece: PuzzlePiece,
@@ -164,7 +220,7 @@ class PuzzleRenderer:
         scale_factor: float
     ) -> Image.Image:
         """
-        Render a soft shadow for a single piece.
+        Render a soft shadow for a single piece using optimized bounding box rendering.
 
         Args:
             piece: Puzzle piece to render shadow for
@@ -174,11 +230,7 @@ class PuzzleRenderer:
         Returns:
             PIL Image with shadow (RGBA, transparent background)
         """
-        # Create transparent canvas for shadow
-        shadow_img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
-        shadow_draw = ImageDraw.Draw(shadow_img)
-
-        # Get transformed outline with offset
+        # Get transformed outline
         outline = self._transform_piece_points(piece, num_points_per_edge, scale_factor)
 
         # Apply shadow offset
@@ -187,21 +239,69 @@ class PuzzleRenderer:
             for x, y in outline
         ]
 
+        # Calculate bounding box for the shadow (with margin for blur)
+        xs = [x for x, y in offset_outline]
+        ys = [y for x, y in offset_outline]
+
+        # Add margin for blur radius
+        margin = self.shadow_blur_radius * 2
+        bbox_left = max(0, int(min(xs) - margin))
+        bbox_top = max(0, int(min(ys) - margin))
+        bbox_right = min(self.width, int(max(xs) + margin))
+        bbox_bottom = min(self.height, int(max(ys) + margin))
+
+        bbox_width = bbox_right - bbox_left
+        bbox_height = bbox_bottom - bbox_top
+
+        # Skip if bounding box is invalid
+        if bbox_width <= 0 or bbox_height <= 0:
+            return Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+
+        # Calculate scaled dimensions
+        scaled_width = max(1, int(bbox_width * self.shadow_render_scale))
+        scaled_height = max(1, int(bbox_height * self.shadow_render_scale))
+        scaled_blur_radius = max(1, int(self.shadow_blur_radius * self.shadow_render_scale))
+
+        # Create small canvas for shadow rendering
+        small_shadow = Image.new('RGBA', (scaled_width, scaled_height), (0, 0, 0, 0))
+        small_draw = ImageDraw.Draw(small_shadow)
+
+        # Transform outline coordinates to small canvas space
+        small_outline = [
+            (
+                int((x - bbox_left) * self.shadow_render_scale),
+                int((y - bbox_top) * self.shadow_render_scale)
+            )
+            for x, y in offset_outline
+        ]
+
         # Calculate shadow color with opacity
         shadow_alpha = int(255 * self.shadow_opacity)
         shadow_color = (0, 0, 0, shadow_alpha)
 
-        # Draw shadow polygon
-        shadow_draw.polygon(offset_outline, fill=shadow_color)
+        # Draw shadow polygon on small canvas
+        small_draw.polygon(small_outline, fill=shadow_color)
 
-        # Apply Gaussian blur for soft edges
-        if self.shadow_blur_radius > 0:
-            shadow_img = shadow_img.filter(
-                ImageFilter.GaussianBlur(radius=self.shadow_blur_radius)
+        # Apply Gaussian blur on small canvas (much faster!)
+        if scaled_blur_radius > 0:
+            small_shadow = small_shadow.filter(
+                ImageFilter.GaussianBlur(radius=scaled_blur_radius)
             )
 
-        return shadow_img
+        # Resize back to bounding box size
+        if self.shadow_render_scale < 1.0:
+            small_shadow = small_shadow.resize(
+                (bbox_width, bbox_height),
+                Image.LANCZOS  # High-quality upscaling
+            )
 
+        # Create full-size transparent canvas and paste the shadow
+        full_shadow = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        full_shadow.paste(small_shadow, (bbox_left, bbox_top))
+
+        return full_shadow
+
+    @timed
     def render(
         self,
         pieces: List[PuzzlePiece],

@@ -11,6 +11,8 @@ from app.main.puzzle_solver.piece_extraction.extractor import PieceSegmenter
 from app.main.puzzle_solver.piece_extraction.extractor_visualizer import PieceVisualizer
 from app.main.puzzle_solver.edge_detection.edge_detector import EdgeDetector
 from app.main.puzzle_solver.edge_detection.edge_detector_visualizer import EdgeVisualizer
+from app.main.puzzle_solver.preprocessing.global_cleaner import GlobalCleaner
+from app.main.puzzle_solver.preprocessing.image_cleaner import ImageCleaner
 
 # Get absolute base path (app/ directory)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +24,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 segmenters_cache = {}
+cleaned_images_cache = {}  # Cache for globally cleaned images
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -57,6 +60,162 @@ def upload_image():
     return jsonify({'error': 'Invalid file type. Please upload PNG, JPG, or JPEG'}), 400
 
 
+@main_bp.route('/calibrate', methods=['POST'])
+def calibrate():
+    """Calibrate global cleaning parameters from test images."""
+    if 'files' not in request.files:
+        return jsonify({'error': 'No test images provided'}), 400
+
+    files = request.files.getlist('files')
+
+    if not files or files[0].filename == '':
+        return jsonify({'error': 'No test images selected'}), 400
+
+    try:
+        # Load test images
+        test_images = []
+        for file in files:
+            if file and allowed_file(file.filename):
+                # Read image from file
+                file_bytes = np.frombuffer(file.read(), np.uint8)
+                img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                if img is not None:
+                    test_images.append(img)
+
+        if not test_images:
+            return jsonify({'error': 'No valid test images found'}), 400
+
+        # Initialize GlobalCleaner and calibrate
+        global_cleaner = GlobalCleaner()
+        params = global_cleaner.calibrate(test_images)
+
+        # Get calibration info
+        info = global_cleaner.get_calibration_info()
+
+        return jsonify({
+            'success': True,
+            'message': f'Calibration complete with {len(test_images)} test image(s)',
+            'calibration_info': info,
+            'parameters': {k: str(v) if not isinstance(v, (int, float, bool, str, type(None))) else v
+                          for k, v in params.items()}
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/clean-global/<filename>')
+def clean_global(filename):
+    """Apply global cleaning to full puzzle image (Step 1.5)."""
+    filepath = UPLOAD_FOLDER / filename
+
+    if not filepath.exists():
+        return jsonify({'error': 'File not found'}), 404
+
+    try:
+        # Load image
+        image = cv2.imread(str(filepath))
+        if image is None:
+            return jsonify({'error': 'Failed to load image'}), 500
+
+        # Initialize GlobalCleaner and load calibration
+        global_cleaner = GlobalCleaner()
+
+        if not global_cleaner.is_calibrated:
+            return jsonify({
+                'warning': 'No calibration found. Using default corrections.',
+                'message': 'Please calibrate first using POST /calibrate for optimal results.'
+            }), 200
+
+        # Apply global cleaning
+        cleaned_image = global_cleaner.clean(image)
+
+        # Cache cleaned image for extraction step
+        cleaned_images_cache[filename] = cleaned_image
+
+        # Save visualization (before/after comparison)
+        before_after = np.hstack([image, cleaned_image])
+        vis_filename = f"global_clean_{filename}"
+        vis_path = OUTPUT_FOLDER / vis_filename
+        cv2.imwrite(str(vis_path), before_after)
+
+        # Get calibration info
+        calib_info = global_cleaner.get_calibration_info()
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'calibration_info': calib_info,
+            'images': {
+                'before_after': vis_filename
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/clean-pieces/<filename>')
+def clean_pieces(filename):
+    """Apply local cleaning to extracted pieces (Step 3)."""
+
+    # Check if we have extracted pieces
+    if filename not in segmenters_cache:
+        return jsonify({'error': 'Please extract pieces first'}), 400
+
+    try:
+        segmenter = segmenters_cache[filename]
+
+        # Initialize ImageCleaner
+        image_cleaner = ImageCleaner()
+
+        # Clean all pieces
+        cleaned_pieces = image_cleaner.clean_pieces(segmenter.pieces)
+
+        # Create visualizations
+        visualizer = PieceVisualizer(output_dir=str(OUTPUT_FOLDER))
+
+        # Visualize cleaned pieces
+        cleaned_images = visualizer.visualize_pieces(segmenter, f"cleaned_{filename}")
+
+        # Create contour comparison visualization
+        filepath = UPLOAD_FOLDER / filename
+        original_image = cv2.imread(str(filepath))
+
+        # Check if cleaned image exists in cache
+        if filename in cleaned_images_cache:
+            original_image = cleaned_images_cache[filename]
+
+        # Draw both contours (red = original, green = cleaned)
+        comparison = original_image.copy()
+        for piece in segmenter.pieces:
+            if hasattr(piece, 'contour_original'):
+                cv2.drawContours(comparison, [piece.contour_original], -1, (0, 0, 255), 2)  # Red
+            cv2.drawContours(comparison, [piece.contour], -1, (0, 255, 0), 2)  # Green
+
+        # Save comparison
+        comparison_filename = f"contour_comparison_{filename}"
+        comparison_path = OUTPUT_FOLDER / comparison_filename
+        cv2.imwrite(str(comparison_path), comparison)
+
+        # Get piece statistics after cleaning
+        stats = segmenter.get_piece_statistics()
+
+        return jsonify({
+            'success': True,
+            'num_pieces': len(cleaned_pieces),
+            'statistics': {k: float(v) if isinstance(v, (np.float64, np.float32)) else v
+                          for k, v in stats.items()},
+            'images': {
+                'cleaned_pieces': cleaned_images,
+                'contour_comparison': comparison_filename
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @main_bp.route('/extract/<filename>')
 def extract_pieces(filename):
     filepath = UPLOAD_FOLDER / filename
@@ -65,8 +224,33 @@ def extract_pieces(filename):
         return jsonify({'error': 'File not found'}), 404
 
     try:
-        # Initialize segmenter and visualizer
-        segmenter = PieceSegmenter(str(filepath))
+        # Get optional segmentation parameters from query string
+        blur_kernel = request.args.get('blur_kernel', type=int)
+        morph_kernel = request.args.get('morph_kernel', type=int)
+        morph_close_iter = request.args.get('morph_close_iter', type=int)
+        morph_open_iter = request.args.get('morph_open_iter', type=int)
+
+        # Check if we have a globally cleaned version
+        if filename in cleaned_images_cache:
+            # Use cleaned image for segmentation
+            image = cleaned_images_cache[filename]
+            segmenter = PieceSegmenter(
+                image_array=image,
+                blur_kernel=blur_kernel,
+                morph_kernel=morph_kernel,
+                morph_close_iter=morph_close_iter,
+                morph_open_iter=morph_open_iter
+            )
+        else:
+            # Use original uploaded image
+            segmenter = PieceSegmenter(
+                str(filepath),
+                blur_kernel=blur_kernel,
+                morph_kernel=morph_kernel,
+                morph_close_iter=morph_close_iter,
+                morph_open_iter=morph_open_iter
+            )
+
         visualizer = PieceVisualizer(output_dir=str(OUTPUT_FOLDER))
 
         # Segment pieces

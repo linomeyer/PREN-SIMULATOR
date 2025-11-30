@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
 from .cuts import Cut, StraightCut, create_cut, ReversedCut
+from ..performance import timed
 
 
 @dataclass
@@ -283,6 +284,7 @@ class PuzzleGenerator:
 
         return PuzzlePiece(row=row, col=col, edges=edges)
 
+    @timed
     def _randomize_placement(
         self,
         pieces: List[PuzzlePiece],
@@ -462,6 +464,7 @@ class PuzzleGenerator:
             # Set position
             piece.center = (piece_center_x, piece_center_y)
 
+    @timed
     def generate(
         self,
         cut_types: List[str],

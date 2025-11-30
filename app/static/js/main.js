@@ -1,13 +1,17 @@
 // Event Handlers
 fileInput.addEventListener('change', function() {
     if (this.files && this.files[0]) {
+        cleanGlobalBtn.disabled = false;
         extractBtn.disabled = false;
+        cleanPiecesBtn.disabled = true;
         cornersBtn.disabled = true;
         matchingBtn.disabled = true;
         showStatus('File selected: ' + this.files[0].name, 'info');
         uploadedFilename = null;
         selectedVariantBlob = null;
+        globalCleanResults.classList.remove('active');
         extractionResults.classList.remove('active');
+        pieceCleanResults.classList.remove('active');
         edgeResults.classList.remove('active');
         matchResults.classList.remove('active');
         generatedVariants.classList.remove('active');
@@ -17,7 +21,9 @@ fileInput.addEventListener('change', function() {
 generateBtn.addEventListener('click', async function() {
     // Disable buttons
     generateBtn.disabled = true;
+    cleanGlobalBtn.disabled = true;
     extractBtn.disabled = true;
+    cleanPiecesBtn.disabled = true;
     cornersBtn.disabled = true;
     matchingBtn.disabled = true;
 
@@ -25,7 +31,9 @@ generateBtn.addEventListener('click', async function() {
     loadingText.textContent = 'Generiere Puzzles (kann 5-15 Sekunden dauern)...';
     loading.classList.add('active');
     generatedVariants.classList.remove('active');
+    globalCleanResults.classList.remove('active');
     extractionResults.classList.remove('active');
+    pieceCleanResults.classList.remove('active');
     edgeResults.classList.remove('active');
     matchResults.classList.remove('active');
 
@@ -125,12 +133,132 @@ extractBtn.addEventListener('click', async function() {
         displayExtractionResults(extractResult);
         showStatus(`Successfully extracted ${extractResult.num_pieces} puzzle pieces!`, 'success');
 
-        // Enable edge detection button
+        // Enable piece cleaning and edge detection buttons
+        cleanPiecesBtn.disabled = false;
         cornersBtn.disabled = false;
 
     } catch (error) {
         showStatus('Error: ' + error.message, 'error');
         extractBtn.disabled = false;
+    } finally {
+        loading.classList.remove('active');
+    }
+});
+
+cleanGlobalBtn.addEventListener('click', async function() {
+    const file = fileInput.files[0];
+    if (!file && !selectedVariantBlob) {
+        showStatus('Please select a file or generate a puzzle first', 'error');
+        return;
+    }
+
+    // First upload the file if not already uploaded
+    if (!uploadedFilename) {
+        cleanGlobalBtn.disabled = true;
+        extractBtn.disabled = true;
+
+        showStatus('Uploading file...', 'info');
+        loadingText.textContent = 'Uploading file...';
+        loading.classList.add('active');
+
+        const formData = new FormData();
+        if (selectedVariantBlob) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `puzzle_seed${selectedVariantSeed}_${timestamp}.png`;
+            formData.append('file', selectedVariantBlob, filename);
+        } else {
+            formData.append('file', file);
+        }
+
+        try {
+            const uploadResponse = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const uploadResult = await uploadResponse.json();
+
+            if (!uploadResult.success) {
+                throw new Error(uploadResult.error || 'Upload failed');
+            }
+
+            uploadedFilename = uploadResult.filename;
+        } catch (error) {
+            showStatus('Error: ' + error.message, 'error');
+            cleanGlobalBtn.disabled = false;
+            extractBtn.disabled = false;
+            loading.classList.remove('active');
+            return;
+        }
+    }
+
+    // Now apply global cleaning
+    cleanGlobalBtn.disabled = true;
+    extractBtn.disabled = true;
+
+    showStatus('Applying global cleaning...', 'info');
+    loadingText.textContent = 'Cleaning image globally...';
+    loading.classList.add('active');
+
+    try {
+        const cleanResponse = await fetch(`/clean-global/${uploadedFilename}`);
+        const cleanResult = await cleanResponse.json();
+
+        if (!cleanResult.success && !cleanResult.warning) {
+            throw new Error(cleanResult.error || 'Global cleaning failed');
+        }
+
+        // Display results
+        displayGlobalCleanResults(cleanResult);
+
+        if (cleanResult.warning) {
+            showStatus(cleanResult.warning + ' ' + cleanResult.message, 'warning');
+        } else {
+            showStatus('Global cleaning completed!', 'success');
+        }
+
+        // Enable extraction button
+        extractBtn.disabled = false;
+
+    } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+        cleanGlobalBtn.disabled = false;
+    } finally {
+        loading.classList.remove('active');
+    }
+});
+
+cleanPiecesBtn.addEventListener('click', async function() {
+    if (!uploadedFilename) {
+        showStatus('Please extract pieces first', 'error');
+        return;
+    }
+
+    cleanPiecesBtn.disabled = true;
+    cornersBtn.disabled = true;
+
+    showStatus('Cleaning puzzle pieces...', 'info');
+    loadingText.textContent = 'Cleaning pieces...';
+    loading.classList.add('active');
+
+    try {
+        const cleanResponse = await fetch(`/clean-pieces/${uploadedFilename}`);
+        const cleanResult = await cleanResponse.json();
+
+        if (!cleanResult.success) {
+            throw new Error(cleanResult.error || 'Piece cleaning failed');
+        }
+
+        // Display results
+        displayPieceCleanResults(cleanResult);
+        showStatus(`Successfully cleaned ${cleanResult.num_pieces} pieces!`, 'success');
+
+        // Enable edge detection button
+        cornersBtn.disabled = false;
+
+    } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+        cleanPiecesBtn.disabled = false;
     } finally {
         loading.classList.remove('active');
     }
@@ -217,13 +345,17 @@ resetBtn.addEventListener('click', function() {
 
     // Reset button states
     generateBtn.disabled = false;
+    cleanGlobalBtn.disabled = true;
     extractBtn.disabled = true;
+    cleanPiecesBtn.disabled = true;
     cornersBtn.disabled = true;
     matchingBtn.disabled = true;
 
     // Hide all result sections
     generatedVariants.classList.remove('active');
+    globalCleanResults.classList.remove('active');
     extractionResults.classList.remove('active');
+    pieceCleanResults.classList.remove('active');
     edgeResults.classList.remove('active');
     matchResults.classList.remove('active');
 
@@ -524,9 +656,14 @@ function displayVariants(variants) {
                 <h4 style="margin-bottom: 5px;">Kamera-Bild (mit Rauschen)</h4>
                 <img src="data:image/png;base64,${variant.noisy_image}" alt="Noisy puzzle" style="width: 100%; border-radius: 5px;">
             </div>
-            <div>
+            <div style="margin-bottom: 15px;">
                 <h4 style="margin-bottom: 5px;">Lösung</h4>
                 <img src="data:image/png;base64,${variant.solution_image}" alt="Solution puzzle" style="width: 100%; border-radius: 5px;">
+            </div>
+            <div style="text-align: center;">
+                <button class="calibrate-btn btn" data-variant-idx="${idx}" style="background: #2196F3; padding: 8px 16px; font-size: 0.9em;">
+                    📐 Kalibrieren
+                </button>
             </div>
         `;
 
@@ -553,13 +690,15 @@ function displayVariants(variants) {
             selectedVariantBlob = new Blob([byteArray], { type: 'image/png' });
             selectedVariantSeed = metadata.seed;
 
-            // Enable extract button
+            // Enable global clean and extract buttons
+            cleanGlobalBtn.disabled = false;
             extractBtn.disabled = false;
+            cleanPiecesBtn.disabled = true;
             cornersBtn.disabled = true;
             matchingBtn.disabled = true;
             uploadedFilename = null;
 
-            showStatus(`Variante ${idx + 1} ausgewählt (Seed: ${metadata.seed}). Klicke auf "2 - Teile extrahieren" um fortzufahren.`, 'success');
+            showStatus(`Variante ${idx + 1} ausgewählt (Seed: ${metadata.seed}). Klicke auf "2 - Global säubern" oder "3 - Teile extrahieren".`, 'success');
         });
 
         // Add hover effect
@@ -574,9 +713,172 @@ function displayVariants(variants) {
             }
         });
 
+        // Add click handler for calibration button
+        const calibrateBtn = variantCard.querySelector('.calibrate-btn');
+        calibrateBtn.addEventListener('click', async function(e) {
+            e.stopPropagation(); // Prevent variant selection when clicking calibrate button
+
+            const btn = e.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Kalibriere...';
+
+            showStatus('Kalibriere Barrel Distortion aus Raster...', 'info');
+
+            try {
+                // Send noisy image to calibration endpoint
+                const response = await fetch('/puzzle-gen/calibrate-from-grid', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: variant.noisy_image
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Calibration failed');
+                }
+
+                // Display calibration results
+                const calib = result.calibration;
+                showStatus(
+                    `Kalibrierung erfolgreich! ` +
+                    `k1=${calib.k1.toFixed(3)}, k2=${calib.k2.toFixed(3)}, k3=${calib.k3.toFixed(3)} | ` +
+                    `${calib.num_lines_detected} Linien erkannt, RMS Error=${calib.rms_error.toFixed(2)}px`,
+                    'success'
+                );
+
+                btn.textContent = '✓ Kalibriert';
+                btn.style.background = '#4CAF50';
+
+            } catch (error) {
+                showStatus('Calibration error: ' + error.message, 'error');
+                btn.textContent = '📐 Kalibrieren';
+                btn.disabled = false;
+            }
+        });
+
         variantsGrid.appendChild(variantCard);
     });
 
     // Scroll to variants
     generatedVariants.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function displayGlobalCleanResults(data) {
+    // Show results section
+    globalCleanResults.classList.add('active');
+
+    // Display calibration info in stats grid
+    const statsGrid = document.getElementById('globalCleanStatsGrid');
+    const calibInfo = data.calibration_info || '';
+    const lines = calibInfo.split('\n');
+
+    let statsHTML = '';
+    lines.forEach(line => {
+        if (line.trim()) {
+            const parts = line.split(':');
+            if (parts.length === 2) {
+                statsHTML += `
+                    <div class="stat-card">
+                        <div class="value">${parts[1].trim()}</div>
+                        <div class="label">${parts[0].trim()}</div>
+                    </div>
+                `;
+            }
+        }
+    });
+
+    statsGrid.innerHTML = statsHTML;
+
+    // Display before/after comparison image
+    const grid = document.getElementById('globalCleanGrid');
+    if (data.images && data.images.before_after) {
+        grid.innerHTML = `
+            <div class="piece-card">
+                <img src="/output/${data.images.before_after}" alt="Before/After Comparison"
+                     style="cursor: pointer;"
+                     onclick="window.open('/output/${data.images.before_after}', '_blank')">
+                <div class="piece-info" style="text-align: center;">
+                    <div><strong>Links:</strong> Original</div>
+                    <div><strong>Rechts:</strong> Gesäubert</div>
+                    <div style="color: #666; font-size: 0.9em; margin-top: 5px;">Klicke zum Vergrößern</div>
+                </div>
+            </div>
+        `;
+    } else {
+        grid.innerHTML = '<p>Keine Visualisierung verfügbar</p>';
+    }
+
+    // Scroll to results
+    globalCleanResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function displayPieceCleanResults(data) {
+    // Show results section
+    pieceCleanResults.classList.add('active');
+
+    // Display statistics
+    const statsGrid = document.getElementById('pieceCleanStatsGrid');
+    const stats = data.statistics || {};
+    statsGrid.innerHTML = `
+        <div class="stat-card">
+            <div class="value">${data.num_pieces}</div>
+            <div class="label">Gesäuberte Teile</div>
+        </div>
+        <div class="stat-card">
+            <div class="value">${Math.round(stats.avg_area || 0)}</div>
+            <div class="label">Avg Area (px²)</div>
+        </div>
+        <div class="stat-card">
+            <div class="value">${Math.round(stats.avg_perimeter || 0)}</div>
+            <div class="label">Avg Perimeter (px)</div>
+        </div>
+    `;
+
+    // Display contour comparison
+    const comparisonGrid = document.getElementById('contourComparisonGrid');
+    if (data.images && data.images.contour_comparison) {
+        comparisonGrid.innerHTML = `
+            <div class="piece-card">
+                <img src="/output/${data.images.contour_comparison}" alt="Contour Comparison"
+                     style="cursor: pointer;"
+                     onclick="window.open('/output/${data.images.contour_comparison}', '_blank')">
+                <div class="piece-info" style="text-align: center;">
+                    <div><strong style="color: red;">Rot:</strong> Original-Konturen</div>
+                    <div><strong style="color: green;">Grün:</strong> Gesäuberte Konturen</div>
+                    <div style="color: #666; font-size: 0.9em; margin-top: 5px;">Klicke zum Vergrößern</div>
+                </div>
+            </div>
+        `;
+    } else {
+        comparisonGrid.innerHTML = '<p>Keine Kontur-Visualisierung verfügbar</p>';
+    }
+
+    // Display cleaned pieces
+    const piecesGrid = document.getElementById('cleanedPiecesGrid');
+    piecesGrid.innerHTML = '';
+
+    if (data.images && data.images.cleaned_pieces) {
+        data.images.cleaned_pieces.forEach((pieceFilename, idx) => {
+            const pieceCard = document.createElement('div');
+            pieceCard.className = 'piece-card';
+            pieceCard.innerHTML = `
+                <img src="/output/${pieceFilename}" alt="Cleaned Piece ${idx}">
+                <div class="piece-info">
+                    <div><strong>Piece ID:</strong> ${idx}</div>
+                    <div><strong>Status:</strong> Gesäubert</div>
+                </div>
+            `;
+            piecesGrid.appendChild(pieceCard);
+        });
+    } else {
+        piecesGrid.innerHTML = '<p>Keine gesäuberten Teile verfügbar</p>';
+    }
+
+    // Scroll to results
+    pieceCleanResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

@@ -11,6 +11,7 @@ from .geometry.puzzle import PuzzleGenerator, PuzzlePiece
 from .rendering.renderer import PuzzleRenderer
 from .rendering.watermark import Watermark
 from .simulation.camera import CameraSimulator
+from .performance import timed, print_performance_report
 
 
 @dataclass
@@ -101,6 +102,7 @@ class PuzzleGenerationResult:
         return saved_files
 
 
+@timed
 def generate_puzzle_geometry(
     config: GeneratorConfig,
     cut_types: list[str]
@@ -141,6 +143,7 @@ def generate_puzzle_geometry(
     return pieces, seed, generator, debug_info
 
 
+@timed
 def render_clean_image(
     pieces: list[PuzzlePiece],
     config: GeneratorConfig,
@@ -165,6 +168,9 @@ def render_clean_image(
     Returns:
         Rendered image as numpy array
     """
+    # Convert grid spacing from mm to pixels
+    grid_spacing_px = config.render.grid_spacing_mm / 25.4 * config.puzzle.dpi
+
     renderer = PuzzleRenderer(
         width=config.output.max_width,
         height=config.output.max_height,
@@ -175,7 +181,11 @@ def render_clean_image(
         shadow_offset_x=config.render.shadow_offset_x,
         shadow_offset_y=config.render.shadow_offset_y,
         shadow_blur_radius=config.render.shadow_blur_radius,
-        shadow_opacity=config.render.shadow_opacity
+        shadow_opacity=config.render.shadow_opacity,
+        shadow_render_scale=config.render.shadow_render_scale,
+        grid_spacing_px=grid_spacing_px,
+        grid_line_thickness=config.render.grid_line_thickness,
+        grid_line_color=config.render.grid_line_color
     )
 
     scale_factor = debug_info.get('scale_factor', 1.0)
@@ -195,6 +205,7 @@ def render_clean_image(
     return clean_array
 
 
+@timed
 def render_solution_image(
     generator: PuzzleGenerator,
     config: GeneratorConfig,
@@ -224,6 +235,9 @@ def render_solution_image(
         gap_px=15  # Small gap between pieces to see the solution clearly
     )
 
+    # Convert grid spacing from mm to pixels
+    grid_spacing_px = config.render.grid_spacing_mm / 25.4 * config.puzzle.dpi
+
     # Create renderer
     renderer = PuzzleRenderer(
         width=config.output.max_width,
@@ -235,7 +249,11 @@ def render_solution_image(
         shadow_offset_x=config.render.shadow_offset_x,
         shadow_offset_y=config.render.shadow_offset_y,
         shadow_blur_radius=config.render.shadow_blur_radius,
-        shadow_opacity=config.render.shadow_opacity
+        shadow_opacity=config.render.shadow_opacity,
+        shadow_render_scale=config.render.shadow_render_scale,
+        grid_spacing_px=grid_spacing_px,
+        grid_line_thickness=config.render.grid_line_thickness,
+        grid_line_color=config.render.grid_line_color
     )
 
     # Render solution
@@ -271,6 +289,9 @@ def render_debug_image(
     Returns:
         Rendered debug image as numpy array
     """
+    # Convert grid spacing from mm to pixels
+    grid_spacing_px = config.render.grid_spacing_mm / 25.4 * config.puzzle.dpi
+
     renderer = PuzzleRenderer(
         width=config.output.max_width,
         height=config.output.max_height,
@@ -281,13 +302,18 @@ def render_debug_image(
         shadow_offset_x=config.render.shadow_offset_x,
         shadow_offset_y=config.render.shadow_offset_y,
         shadow_blur_radius=config.render.shadow_blur_radius,
-        shadow_opacity=config.render.shadow_opacity
+        shadow_opacity=config.render.shadow_opacity,
+        shadow_render_scale=config.render.shadow_render_scale,
+        grid_spacing_px=grid_spacing_px,
+        grid_line_thickness=config.render.grid_line_thickness,
+        grid_line_color=config.render.grid_line_color
     )
 
     debug_img = renderer.render_debug(pieces, debug_info)
     return np.array(debug_img)
 
 
+@timed
 def apply_camera_simulation(
     clean_image: np.ndarray,
     camera_config: CameraConfig
@@ -302,11 +328,15 @@ def apply_camera_simulation(
     Returns:
         Image with camera effects applied as numpy array
     """
-    camera = CameraSimulator.from_config(camera_config.get_scaled_params())
+    camera = CameraSimulator.from_config(
+        camera_config.get_scaled_params(),
+        use_optimized_noise=camera_config.use_optimized_noise
+    )
     noisy_array = camera.simulate(clean_image)
     return noisy_array
 
 
+@timed
 def generate_puzzle_images(
     config: GeneratorConfig,
     cut_types: list[str],
