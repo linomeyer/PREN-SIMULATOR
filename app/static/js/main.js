@@ -325,10 +325,45 @@ matchingBtn.addEventListener('click', async function() {
         // Display match results
         displayMatchResults(matchResult);
         showStatus(`Successfully found ${matchResult.num_matches} matches!`, 'success');
+        solverBtn.disabled = false;
 
     } catch (error) {
         showStatus('Error: ' + error.message, 'error');
         matchingBtn.disabled = false;
+    } finally {
+        loading.classList.remove('active');
+    }
+});
+
+solverBtn.addEventListener('click', async function() {
+    if (!uploadedFilename) {
+        showStatus('Please extract pieces first', 'error');
+        return;
+    }
+
+    // Disable button
+    solverBtn.disabled = true;
+
+    showStatus('Solving puzzle...', 'info');
+    loadingText.textContent = 'Solving puzzle...';
+    loading.classList.add('active');
+    solutionResults.classList.remove('active');
+
+    try {
+        const solveResponse = await fetch(`/solve-puzzle/${uploadedFilename}`);
+        const solveResult = await solveResponse.json();
+
+        if (!solveResult.success) {
+            throw new Error(solveResult.error || 'Puzzle solving failed');
+        }
+
+        // Display solution results
+        displaySolutionResults(solveResult);
+        showStatus(`Puzzle solved! ${solveResult.solution.pieces_placed}/${solveResult.solution.total_pieces} pieces placed (${(solveResult.solution.confidence * 100).toFixed(1)}% confidence)`, 'success');
+
+    } catch (error) {
+        showStatus('Error: ' + error.message, 'error');
+        solverBtn.disabled = false;
     } finally {
         loading.classList.remove('active');
     }
@@ -350,6 +385,7 @@ resetBtn.addEventListener('click', function() {
     cleanPiecesBtn.disabled = true;
     cornersBtn.disabled = true;
     matchingBtn.disabled = true;
+    solverBtn.disabled = true;
 
     // Hide all result sections
     generatedVariants.classList.remove('active');
@@ -358,6 +394,7 @@ resetBtn.addEventListener('click', function() {
     pieceCleanResults.classList.remove('active');
     edgeResults.classList.remove('active');
     matchResults.classList.remove('active');
+    solutionResults.classList.remove('active');
 
     // Hide loading
     loading.classList.remove('active');
@@ -624,6 +661,101 @@ function displayEdgeResults(data) {
 
     // Scroll to match results
     matchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function displaySolutionResults(data) {
+    // Show results section
+    solutionResults.classList.add('active');
+
+    const solutionContent = document.getElementById('solutionContent');
+    const solution = data.solution;
+
+    let html = `
+        <div class="info-box">
+            <h4>📊 Lösungs-Statistik</h4>
+            <p><strong>Gittergröße:</strong> ${solution.grid_rows} × ${solution.grid_cols}</p>
+            <p><strong>Platzierte Teile:</strong> ${solution.pieces_placed} / ${solution.total_pieces}</p>
+            <p><strong>Vertrauen:</strong> ${(solution.confidence * 100).toFixed(1)}%</p>
+            <p><strong>Verwendete Matches:</strong> ${solution.matches_used}</p>
+        </div>
+
+        <div class="info-box">
+            <h4>📍 Gitter-Layout</h4>
+            <table style="border-collapse: collapse; margin: 10px auto;">
+    `;
+
+    // Create grid table
+    for (let row = 0; row < solution.grid_rows; row++) {
+        html += '<tr>';
+        for (let col = 0; col < solution.grid_cols; col++) {
+            const pieceId = solution.grid_layout[row][col];
+            const cellContent = pieceId !== null ? `P${pieceId}` : '?';
+            const cellClass = pieceId !== null ? 'grid-cell-filled' : 'grid-cell-empty';
+            html += `<td class="${cellClass}" style="border: 1px solid #ccc; padding: 8px; text-align: center; min-width: 50px;">${cellContent}</td>`;
+        }
+        html += '</tr>';
+    }
+
+    html += `
+            </table>
+        </div>
+
+        <div class="info-box">
+            <h4>🔄 Teile-Rotationen</h4>
+            <div style="max-height: 200px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #f0f0f0;">
+                            <th style="padding: 5px; border: 1px solid #ddd;">Piece</th>
+                            <th style="padding: 5px; border: 1px solid #ddd;">Position (Row, Col)</th>
+                            <th style="padding: 5px; border: 1px solid #ddd;">Rotation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    for (const piece of solution.placed_pieces) {
+        html += `
+            <tr>
+                <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">P${piece.piece_id}</td>
+                <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">(${piece.grid_position.row}, ${piece.grid_position.col})</td>
+                <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">${piece.rotation.toFixed(0)}°</td>
+            </tr>
+        `;
+    }
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Add visualization images
+    if (data.images && data.images.solution_visualizations) {
+        html += '<div class="images-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; margin-top: 20px;">';
+        for (const imgFilename of data.images.solution_visualizations) {
+            html += `
+                <div class="image-item piece-card" style="text-align: center;">
+                    <img src="/output/${imgFilename}" alt="Solution visualization" 
+                         style="width: 100%; cursor: pointer;"
+                         onclick="window.open('/output/${imgFilename}', '_blank')">
+                    <p style="margin-top: 10px; font-weight: bold;">
+                        ${imgFilename.includes('assembled') ? 'Zusammengesetztes Puzzle' : 
+                          imgFilename.includes('grid') ? 'Gitter-Diagramm' : 
+                          imgFilename.includes('rotations') ? 'Rotations-Guide' : 'Visualisierung'}
+                    </p>
+                    <p style="color: #666; font-size: 0.9em;">Klicke zum Vergrößern</p>
+                </div>
+            `;
+        }
+        html += '</div>';
+    }
+
+    solutionContent.innerHTML = html;
+
+    // Scroll to results
+    solutionResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function displayVariants(variants) {

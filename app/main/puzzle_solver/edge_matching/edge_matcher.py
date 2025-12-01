@@ -3,6 +3,7 @@ from typing import List, Tuple, Dict, Set
 from dataclasses import dataclass
 from app.main.puzzle_solver.edge_detection.edge_detector import PieceEdge, EdgeDetector
 
+
 @dataclass
 class EdgeMatch:
     """Represents a potential match between two edges."""
@@ -13,7 +14,7 @@ class EdgeMatch:
     shape_similarity: float
     classification_match: bool
     rotation_offset: int  # Discrete 90° rotations for backward compatibility
-    rotation_angle: float  # NEW: Actual rotation angle in degrees
+    rotation_angle: float  # Actual rotation angle in degrees
 
     def __repr__(self):
         return (f"EdgeMatch(piece_{self.edge1.piece_id}_{self.edge1.edge_type} <-> "
@@ -25,7 +26,6 @@ class EdgeMatcher:
     """Matches puzzle piece edges to find compatible pairs, accounting for rotation."""
 
     # Mapping of how edges align when pieces are rotated
-    # rotation_offset: {original_edge: edge_after_rotation}
     ROTATION_MAP = {
         0: {'top': 'top', 'right': 'right', 'bottom': 'bottom', 'left': 'left'},
         1: {'top': 'right', 'right': 'bottom', 'bottom': 'left', 'left': 'top'},  # 90° CW
@@ -33,8 +33,6 @@ class EdgeMatcher:
         3: {'top': 'left', 'right': 'top', 'bottom': 'right', 'left': 'bottom'}  # 270° CW
     }
 
-    # Which edges should be adjacent for matching (opposite edges touch)
-    # e.g., if piece1's 'right' edge matches, it should connect to piece2's 'left' edge
     ADJACENT_EDGES = {
         'top': 'bottom',
         'bottom': 'top',
@@ -56,7 +54,6 @@ class EdgeMatcher:
         """
         Find unique best matches for all non-flat edges.
         Each edge can only be used once. Eliminates duplicate matches.
-        Considers actual edge angles, not just 90° rotations.
 
         Args:
             min_score: Minimum compatibility score (0.0 to 1.0)
@@ -67,27 +64,22 @@ class EdgeMatcher:
         all_potential_matches = []
         seen_edge_pairs: Set[Tuple[Tuple[int, str], Tuple[int, str]]] = set()
 
-        # Get all edges organized by piece
         piece_edges = self.edge_detector.piece_edges
 
         # Compare edges from different pieces
         for piece1_id, edges1 in piece_edges.items():
             for piece2_id, edges2 in piece_edges.items():
-                # Only process each piece pair once (avoid A->B and B->A)
                 if piece1_id >= piece2_id:
                     continue
 
-                # Compare all edges with angle-based alignment
-                matches_for_pair = self._find_matches_with_angles(
+                # Find all potential matches between these two pieces
+                matches_for_pair = self._find_matches_between_pieces(
                     piece1_id, edges1, piece2_id, edges2, min_score
                 )
 
-                # Filter out duplicate edge pairs
                 for match in matches_for_pair:
                     edge1_key = (match.edge1.piece_id, match.edge1.edge_type)
                     edge2_key = (match.edge2.piece_id, match.edge2.edge_type)
-
-                    # Create normalized pair (smaller piece_id first)
                     edge_pair = tuple(sorted([edge1_key, edge2_key]))
 
                     if edge_pair not in seen_edge_pairs:
@@ -99,7 +91,7 @@ class EdgeMatcher:
 
         print(f"Found {len(all_potential_matches)} unique potential matches (threshold: {min_score})")
 
-        # Now select the best match for each edge, ensuring no edge is used twice
+        # Select best match for each edge, ensuring no edge is used twice
         used_edges: Set[Tuple[int, str]] = set()
         final_matches: List[EdgeMatch] = []
 
@@ -107,11 +99,9 @@ class EdgeMatcher:
             edge1_key = (match.edge1.piece_id, match.edge1.edge_type)
             edge2_key = (match.edge2.piece_id, match.edge2.edge_type)
 
-            # Skip if either edge has already been matched
             if edge1_key in used_edges or edge2_key in used_edges:
                 continue
 
-            # This is the best available match for these edges
             final_matches.append(match)
             used_edges.add(edge1_key)
             used_edges.add(edge2_key)
@@ -119,19 +109,18 @@ class EdgeMatcher:
         print(f"Selected {len(final_matches)} best unique matches")
         print(f"Matched {len(used_edges)} edges total")
 
-        # Update self.matches
         self.matches = final_matches
-
         return final_matches
 
-    def _find_matches_with_angles(self, piece1_id: int, edges1: Dict[str, PieceEdge],
-                                  piece2_id: int, edges2: Dict[str, PieceEdge],
-                                  min_score: float) -> List[EdgeMatch]:
+    def _find_matches_between_pieces(self, piece1_id: int, edges1: Dict[str, PieceEdge],
+                                     piece2_id: int, edges2: Dict[str, PieceEdge],
+                                     min_score: float) -> List[EdgeMatch]:
         """
-        Find matches between two pieces considering actual edge angles.
+        Find matches between two pieces by comparing all edge combinations.
 
-        For two edges to match, they should be approximately opposite in direction
-        (180° apart) when placed adjacent to each other.
+        The key insight: we don't filter by angle here. Instead, we compare
+        the SHAPE of edges after normalizing them to a common orientation.
+        Two edges match if their shapes are complementary (one is the "inverse" of the other).
 
         Args:
             piece1_id: ID of first piece
@@ -144,17 +133,14 @@ class EdgeMatcher:
             List of EdgeMatch objects
         """
         matches = []
-        angle_tolerance = 2.0  # Tightened to 10° deviation for matching
 
-        # For each edge of piece1
         for edge1_type, edge1 in edges1.items():
             edge1_classification = edge1.get_edge_type_classification()
 
-            # Skip flat edges
+            # Skip flat edges (border edges)
             if edge1_classification == 'flat':
                 continue
 
-            # For each edge of piece2
             for edge2_type, edge2 in edges2.items():
                 edge2_classification = edge2.get_edge_type_classification()
 
@@ -166,61 +152,50 @@ class EdgeMatcher:
                 if not self._are_complementary_edges(edge1_classification, edge2_classification):
                     continue
 
-                # Calculate required rotation for alignment
-                # Two edges should be opposite (180° apart) to fit together
-                angle_diff = self._calculate_angle_difference(edge1.angle, edge2.angle)
+                # Evaluate match by comparing normalized edge shapes
+                match = self._evaluate_edge_match(edge1, edge2)
 
-                # Check if edges are approximately opposite (around 180°)
-                is_opposite = abs(angle_diff - 180.0) < angle_tolerance
-
-                if is_opposite:
-                    # Calculate the exact rotation needed
-                    rotation_angle = self._normalize_angle(edge2.angle - edge1.angle + 180.0)
-
-                    # Evaluate match with actual rotation angle
-                    match = self._evaluate_match_with_angle(edge1, edge2, rotation_angle)
-
-                    if match.compatibility_score >= min_score:
-                        matches.append(match)
+                if match.compatibility_score >= min_score:
+                    matches.append(match)
 
         return matches
 
-    def _evaluate_match_with_angle(self, edge1: PieceEdge, edge2: PieceEdge,
-                                   rotation_angle: float) -> EdgeMatch:
+    def _evaluate_edge_match(self, edge1: PieceEdge, edge2: PieceEdge) -> EdgeMatch:
         """
-        Evaluate the compatibility between two edges with a specific rotation angle.
+        Evaluate the compatibility between two edges.
+
+        This normalizes both edges to a common reference frame and compares:
+        1. Length similarity
+        2. Shape similarity (curvature profile match)
+        3. Classification compatibility
 
         Args:
             edge1: First edge
             edge2: Second edge
-            rotation_angle: Actual rotation angle in degrees
 
         Returns:
             EdgeMatch object with compatibility scores
         """
-        # 1. Length similarity (edges should have similar lengths)
+        # 1. Length similarity
         length_similarity = self._calculate_length_similarity(edge1, edge2)
 
-        # 2. Shape similarity (compare shape signatures)
-        shape_similarity = self._calculate_shape_similarity(edge1, edge2)
+        # 2. Shape similarity - compare normalized edge profiles
+        shape_similarity = self._calculate_normalized_shape_similarity(edge1, edge2)
 
-        # 3. Classification match (tab should match with slot)
+        # 3. Classification match
         classification_match = self._check_classification_compatibility(edge1, edge2)
         classification_score = 1.0 if classification_match else 0.0
 
-        # 4. Angle alignment bonus - reward closer angle matches
-        angle_diff = abs(self._calculate_angle_difference(edge1.angle, edge2.angle) - 180.0)
-        angle_similarity = max(0.0, 1.0 - (angle_diff / 10.0))  # Linear falloff over 10°
-
-        # 5. Calculate overall compatibility score (weighted average)
+        # Calculate overall compatibility score
         compatibility_score = (
-                0.25 * length_similarity +
-                0.45 * shape_similarity +
-                0.15 * classification_score +
-                0.15 * angle_similarity  # NEW: Angle alignment component
+                0.20 * length_similarity +
+                0.60 * shape_similarity +
+                0.20 * classification_score
         )
 
-        # Convert rotation angle to nearest 90° step for backward compatibility
+        # Calculate the rotation angle needed to align edge2 to edge1
+        # When edges match, they should be oriented 180° apart (facing each other)
+        rotation_angle = self._normalize_angle(edge1.angle - edge2.angle + 180.0)
         rotation_offset = int(round(rotation_angle / 90.0)) % 4
 
         return EdgeMatch(
@@ -231,71 +206,18 @@ class EdgeMatcher:
             shape_similarity=shape_similarity,
             classification_match=classification_match,
             rotation_offset=rotation_offset,
-            rotation_angle=rotation_angle  # Store actual angle
+            rotation_angle=rotation_angle
         )
 
-    def _calculate_angle_difference(self, angle1: float, angle2: float) -> float:
+    def _calculate_normalized_shape_similarity(self, edge1: PieceEdge, edge2: PieceEdge) -> float:
         """
-        Calculate the absolute difference between two angles (0-360°).
+        Calculate shape similarity by normalizing both edges to a common frame.
 
-        Args:
-            angle1: First angle in degrees
-            angle2: Second angle in degrees
-
-        Returns:
-            Absolute angle difference (0-180°)
-        """
-        diff = abs(angle1 - angle2)
-
-        # Normalize to 0-180 range (take shorter angle)
-        if diff > 180:
-            diff = 360 - diff
-
-        return diff
-
-    def _normalize_angle(self, angle: float) -> float:
-        """
-        Normalize angle to 0-360 range.
-
-        Args:
-            angle: Angle in degrees
-
-        Returns:
-            Normalized angle (0-360°)
-        """
-        angle = angle % 360
-        if angle < 0:
-            angle += 360
-        return angle
-
-
-    def _are_complementary_edges(self, class1: str, class2: str) -> bool:
-        """
-        Check if two edge classifications are complementary (can fit together).
-
-        Args:
-            class1: Classification of first edge ('flat', 'tab', or 'slot')
-            class2: Classification of second edge ('flat', 'tab', or 'slot')
-
-        Returns:
-            True if edges can fit together, False otherwise
-        """
-        # Tab fits with slot, slot fits with tab
-        if (class1 == 'tab' and class2 == 'slot') or (class1 == 'slot' and class2 == 'tab'):
-            return True
-
-        # Flat edges can match with flat edges (border pieces)
-        if class1 == 'flat' and class2 == 'flat':
-            return True
-
-        # All other combinations cannot fit
-        # (tab-tab, slot-slot, tab-flat, slot-flat, etc.)
-        return False
-
-
-    def _calculate_length_similarity(self, edge1: PieceEdge, edge2: PieceEdge) -> float:
-        """
-        Calculate similarity based on edge lengths.
+        Steps:
+        1. Extract edge points
+        2. Normalize both edges: translate to origin, rotate to horizontal, scale to unit length
+        3. For edge2, also flip vertically (since matching edges are mirror images)
+        4. Compare the resulting profiles
 
         Args:
             edge1: First edge
@@ -304,47 +226,117 @@ class EdgeMatcher:
         Returns:
             Similarity score between 0.0 and 1.0
         """
-        len1 = edge1.length
-        len2 = edge2.length
+        # Get normalized deviation profiles for both edges
+        profile1 = self._get_normalized_edge_profile(edge1, flip=False)
+        profile2 = self._get_normalized_edge_profile(edge2, flip=True)  # Flip for matching
 
-        if len1 == 0 or len2 == 0:
+        if profile1 is None or profile2 is None:
             return 0.0
 
-        # Calculate ratio (always <= 1.0)
-        ratio = min(len1, len2) / max(len1, len2)
+        # Compare profiles - try both forward and reversed
+        similarity_forward = self._compare_profiles(profile1, profile2)
+        similarity_reversed = self._compare_profiles(profile1, profile2[::-1])
 
-        return ratio
+        return max(similarity_forward, similarity_reversed)
 
-    def _calculate_shape_similarity(self, edge1: PieceEdge, edge2: PieceEdge) -> float:
+    def _get_normalized_edge_profile(self, edge: PieceEdge, flip: bool = False,
+                                     num_samples: int = 100) -> np.ndarray:
         """
-        Calculate similarity based on shape signatures (curvature).
+        Get a normalized profile of edge deviations from the baseline.
 
-        For matching edges, one should be approximately the mirror/inverse of the other.
+        This creates a rotation-invariant representation of the edge shape by:
+        1. Rotating the edge to be horizontal
+        2. Measuring perpendicular distances from the baseline
+        3. Normalizing distances by edge length
 
         Args:
-            edge1: First edge
-            edge2: Second edge
+            edge: PieceEdge to process
+            flip: If True, negate the deviations (for matching edge comparison)
+            num_samples: Number of samples along the edge
+
+        Returns:
+            Array of normalized deviation values, or None if edge is invalid
+        """
+        points = edge.points.reshape(-1, 2).astype(np.float64)
+
+        if len(points) < 3:
+            return None
+
+        # Get start and end points
+        start = np.array(edge.start_point, dtype=np.float64)
+        end = np.array(edge.end_point, dtype=np.float64)
+
+        # Calculate baseline vector and length
+        baseline = end - start
+        baseline_length = np.linalg.norm(baseline)
+
+        if baseline_length < 1e-6:
+            return None
+
+        # Normalize baseline direction
+        baseline_dir = baseline / baseline_length
+
+        # Calculate perpendicular direction (90° counter-clockwise)
+        perp_dir = np.array([-baseline_dir[1], baseline_dir[0]])
+
+        # For each point, calculate:
+        # - t: position along baseline (0 to 1)
+        # - d: perpendicular distance from baseline (normalized by length)
+        deviations = []
+
+        for point in points:
+            relative = point - start
+            t = np.dot(relative, baseline_dir) / baseline_length
+            d = np.dot(relative, perp_dir) / baseline_length
+            deviations.append((t, d))
+
+        # Sort by position along baseline
+        deviations.sort(key=lambda x: x[0])
+
+        # Resample to fixed number of points
+        t_values = np.array([d[0] for d in deviations])
+        d_values = np.array([d[1] for d in deviations])
+
+        # Interpolate to uniform samples
+        t_uniform = np.linspace(0, 1, num_samples)
+        profile = np.interp(t_uniform, t_values, d_values)
+
+        if flip:
+            profile = -profile
+
+        return profile
+
+    def _compare_profiles(self, profile1: np.ndarray, profile2: np.ndarray) -> float:
+        """
+        Compare two edge profiles using correlation and distance metrics.
+
+        Args:
+            profile1: First normalized profile
+            profile2: Second normalized profile
 
         Returns:
             Similarity score between 0.0 and 1.0
         """
-        sig1 = edge1.shape_signature
-        sig2 = edge2.shape_signature
+        if len(profile1) != len(profile2):
+            # Resample to match lengths
+            profile2 = np.interp(
+                np.linspace(0, 1, len(profile1)),
+                np.linspace(0, 1, len(profile2)),
+                profile2
+            )
 
-        # For puzzle pieces to fit, one edge should be the inverse of the other
-        # Try both normal and reversed comparison
-        sig2_reversed = sig2[::-1]
+        # Method 1: Correlation
+        correlation = self._calculate_correlation(profile1, profile2)
+        correlation_score = (correlation + 1.0) / 2.0  # Map [-1, 1] to [0, 1]
 
-        # Calculate correlation (inverted because tab should fit into slot)
-        # Use negative correlation since curvatures should be opposite
-        correlation_reversed = self._calculate_correlation(-sig1, sig2_reversed)
-        correlation_normal = self._calculate_correlation(-sig1, sig2)
+        # Method 2: Mean absolute difference
+        diff = np.abs(profile1 - profile2)
+        mean_diff = np.mean(diff)
+        # Typical deviations are 0-0.3 of edge length, so scale accordingly
+        diff_score = max(0.0, 1.0 - mean_diff / 0.15)
 
-        # Take the best correlation
-        similarity = max(correlation_reversed, correlation_normal)
-
-        # Normalize to 0-1 range (correlation is -1 to 1)
-        similarity = (similarity + 1.0) / 2.0
+        # Combine scores
+        similarity = 0.6 * correlation_score + 0.4 * diff_score
 
         return similarity
 
@@ -362,58 +354,56 @@ class EdgeMatcher:
         if len(sig1) == 0 or len(sig2) == 0:
             return 0.0
 
-        # Normalize signatures
         sig1_normalized = sig1 - np.mean(sig1)
         sig2_normalized = sig2 - np.mean(sig2)
 
-        # Calculate correlation
         numerator = np.sum(sig1_normalized * sig2_normalized)
         denominator = np.sqrt(np.sum(sig1_normalized ** 2) * np.sum(sig2_normalized ** 2))
 
-        if denominator == 0:
+        if denominator < 1e-10:
             return 0.0
 
-        correlation = numerator / denominator
-        return float(correlation)
+        return float(numerator / denominator)
+
+    def _normalize_angle(self, angle: float) -> float:
+        """Normalize angle to 0-360 range."""
+        angle = angle % 360
+        if angle < 0:
+            angle += 360
+        return angle
+
+    def _are_complementary_edges(self, class1: str, class2: str) -> bool:
+        """Check if two edge classifications are complementary."""
+        if (class1 == 'tab' and class2 == 'slot') or (class1 == 'slot' and class2 == 'tab'):
+            return True
+        return False
+
+    def _calculate_length_similarity(self, edge1: PieceEdge, edge2: PieceEdge) -> float:
+        """Calculate similarity based on edge lengths."""
+        len1 = edge1.length
+        len2 = edge2.length
+
+        if len1 == 0 or len2 == 0:
+            return 0.0
+
+        ratio = min(len1, len2) / max(len1, len2)
+        return ratio
 
     def _check_classification_compatibility(self, edge1: PieceEdge, edge2: PieceEdge) -> bool:
-        """
-        Check if edge classifications are compatible.
-
-        Compatible pairs:
-        - tab <-> slot
-        - slot <-> tab
-
-        Flat edges should NOT match with anything (they are borders).
-
-        Args:
-            edge1: First edge
-            edge2: Second edge
-
-        Returns:
-            True if classifications are compatible
-        """
+        """Check if edge classifications are compatible (tab matches slot)."""
         class1 = edge1.get_edge_type_classification()
         class2 = edge2.get_edge_type_classification()
 
-        # Flat edges should never match - they are border pieces
         if class1 == 'flat' or class2 == 'flat':
             return False
 
-        # Tab matches with slot
         if (class1 == 'tab' and class2 == 'slot') or (class1 == 'slot' and class2 == 'tab'):
             return True
 
         return False
 
-
     def identify_border_pieces(self) -> Dict[int, Dict[str, any]]:
-        """
-        Identify border and corner pieces based on flat edges.
-
-        Returns:
-            Dictionary mapping piece_id to border information
-        """
+        """Identify border and corner pieces based on flat edges."""
         border_info = {}
 
         for piece_id, edges in self.edge_detector.piece_edges.items():
@@ -441,12 +431,10 @@ class EdgeMatcher:
 
         scores = [m.compatibility_score for m in self.matches]
 
-        # Count matches by rotation
         rotation_counts = {0: 0, 1: 0, 2: 0, 3: 0}
         for match in self.matches:
             rotation_counts[match.rotation_offset] += 1
 
-        # Count matches by classification type
         flat_flat = sum(1 for m in self.matches if
                         m.edge1.get_edge_type_classification() == 'flat' and
                         m.edge2.get_edge_type_classification() == 'flat')
@@ -454,7 +442,6 @@ class EdgeMatcher:
                        'flat' not in [m.edge1.get_edge_type_classification(),
                                       m.edge2.get_edge_type_classification()])
 
-        # Get border piece information
         border_info = self.identify_border_pieces()
         corner_pieces = [pid for pid, info in border_info.items() if info['is_corner']]
         border_pieces = [pid for pid, info in border_info.items() if info['is_border']]

@@ -13,6 +13,8 @@ from app.main.puzzle_solver.edge_detection.edge_detector import EdgeDetector
 from app.main.puzzle_solver.edge_detection.edge_detector_visualizer import EdgeVisualizer
 from app.main.puzzle_solver.preprocessing.global_cleaner import GlobalCleaner
 from app.main.puzzle_solver.preprocessing.image_cleaner import ImageCleaner
+from app.main.puzzle_solver.solver.solver import PuzzleSolver
+from app.main.puzzle_solver.solver.solver_visualizer import SolutionVisualizer
 
 # Get absolute base path (app/ directory)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -425,4 +427,79 @@ def match_edges(filename):
         })
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/solve-puzzle/<filename>')
+def solve_puzzle(filename):
+    """Solve the puzzle by assembling pieces based on edge matches."""
+
+    # Check if we have a cached segmenter
+    if filename not in segmenters_cache:
+        return jsonify({'error': 'Please extract pieces first'}), 400
+
+    try:
+        segmenter = segmenters_cache[filename]
+
+        # Initialize edge detector
+        edge_detector = EdgeDetector(segmenter.pieces)
+        edge_detector.detect_edges()
+
+        # Initialize edge matcher and find matches
+        edge_matcher = EdgeMatcher(edge_detector)
+        min_score = float(request.args.get('min_score', 0.0))
+        edge_matcher.find_unique_best_matches(min_score=min_score)
+
+        # Initialize puzzle solver
+        puzzle_solver = PuzzleSolver(edge_matcher, segmenter.pieces)
+
+        # Solve the puzzle
+        solution = puzzle_solver.solve()
+
+        if solution is None:
+            return jsonify({
+                'success': False,
+                'error': 'Could not solve puzzle - no valid solution found'
+            }), 400
+
+        # Visualize solution
+        solution_visualizer = SolutionVisualizer(output_dir=str(OUTPUT_FOLDER))
+        solution_images = solution_visualizer.visualize_solution(
+            solution, segmenter.pieces, filename
+        )
+
+        # Prepare solution info
+        placed_pieces = []
+        for placed in solution.placed_pieces:
+            placed_pieces.append({
+                'piece_id': placed.piece_id,
+                'grid_position': {
+                    'row': placed.grid_row,
+                    'col': placed.grid_col
+                },
+                'rotation': placed.rotation
+            })
+
+        # Get grid layout
+        grid_layout = solution.get_grid_layout()
+
+        return jsonify({
+            'success': True,
+            'solution': {
+                'grid_rows': solution.grid_rows,
+                'grid_cols': solution.grid_cols,
+                'confidence': solution.confidence,
+                'pieces_placed': len(solution.placed_pieces),
+                'total_pieces': len(segmenter.pieces),
+                'placed_pieces': placed_pieces,
+                'grid_layout': grid_layout,
+                'matches_used': len(solution.matches_used)
+            },
+            'images': {
+                'solution_visualizations': solution_images
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
