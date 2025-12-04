@@ -442,23 +442,23 @@ function displayExtractionResults(data) {
     statsGrid.innerHTML = `
         <div class="stat-card">
             <div class="value">${data.num_pieces}</div>
-            <div class="label">Pieces Found</div>
+            <div class="label">Anzahl Teile</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.avg_area)}</div>
-            <div class="label">Avg Area (px²)</div>
+            <div class="label">Max. Fläche (px²)</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.min_area)}</div>
-            <div class="label">Min Area (px²)</div>
+            <div class="label">Min. Fläche (px²)</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.max_area)}</div>
-            <div class="label">Max Area (px²)</div>
+            <div class="label">Durchschnittsfläche (px²)</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.avg_perimeter)}</div>
-            <div class="label">Avg Perimeter (px)</div>
+            <div class="label">Durchschnittsumfang (px)</div>
         </div>
     `;
 
@@ -497,23 +497,23 @@ function displayEdgeResults(data) {
     edgeStatsGrid.innerHTML = `
         <div class="stat-card">
             <div class="value">${data.num_edges}</div>
-            <div class="label">Total Edges</div>
+            <div class="label">Total Seiten</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.avg_edge_length)}</div>
-            <div class="label">Avg Length (px)</div>
+            <div class="label">Durchschnittslänge (px)</div>
         </div>
         <div class="stat-card">
             <div class="value">${stats.flat_edges}</div>
-            <div class="label">Flat Edges</div>
+            <div class="label">Flache Seiten</div>
         </div>
         <div class="stat-card">
             <div class="value">${stats.tab_edges}</div>
-            <div class="label">Tab Edges</div>
+            <div class="label">Tab Seiten</div>
         </div>
         <div class="stat-card">
             <div class="value">${stats.slot_edges}</div>
-            <div class="label">Slot Edges</div>
+            <div class="label">Slot Seiten</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.min_edge_length)} - ${Math.round(stats.max_edge_length)}</div>
@@ -564,15 +564,15 @@ function displayEdgeResults(data) {
         </div>
         <div class="stat-card">
             <div class="value">${stats.avg_score.toFixed(3)}</div>
-            <div class="label">Avg Score</div>
+            <div class="label">Durchschnittspunkte</div>
         </div>
         <div class="stat-card">
             <div class="value">${stats.high_confidence_matches}</div>
-            <div class="label">High Confidence (≥0.8)</div>
+            <div class="label">Hohe Vertrauenswürdigkeit (≥0.8)</div>
         </div>
         <div class="stat-card">
             <div class="value">${stats.medium_confidence_matches}</div>
-            <div class="label">Medium Confidence (≥0.6)</div>
+            <div class="label">Mittlere Vertrauenswürdigkeit (≥0.6)</div>
         </div>
         <div class="stat-card">
             <div class="value">${stats.tab_slot_matches}</div>
@@ -633,6 +633,7 @@ function displayEdgeResults(data) {
                     <th style="padding: 10px; border: 1px solid #ddd;">Piece 2</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Edge 2</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Score</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Rotation</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Length Sim</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Shape Sim</th>
                 </tr>
@@ -679,7 +680,7 @@ function displaySolutionResults(data) {
 
     let html = `
         <div class="info-box">
-            <h4>📊 Lösungs-Statistik</h4>
+            <h4>Lösungs-Statistik</h4>
             <p><strong>Gittergröße:</strong> ${solution.grid_rows} × ${solution.grid_cols}</p>
             <p><strong>Platzierte Teile:</strong> ${solution.pieces_placed} / ${solution.total_pieces}</p>
             <p><strong>Vertrauen:</strong> ${(solution.confidence * 100).toFixed(1)}%</p>
@@ -687,7 +688,7 @@ function displaySolutionResults(data) {
         </div>
 
         <div class="info-box">
-            <h4>📍 Gitter-Layout</h4>
+            <h4>Gitter-Layout</h4>
             <table style="border-collapse: collapse; margin: 10px auto;">
     `;
 
@@ -713,8 +714,8 @@ function displaySolutionResults(data) {
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr style="background-color: #f0f0f0;">
-                            <th style="padding: 5px; border: 1px solid #ddd;">Piece</th>
-                            <th style="padding: 5px; border: 1px solid #ddd;">Position (Row, Col)</th>
+                            <th style="padding: 5px; border: 1px solid #ddd;">Puzzleteil</th>
+                            <th style="padding: 5px; border: 1px solid #ddd;">Position (Reihe, Spalte)</th>
                             <th style="padding: 5px; border: 1px solid #ddd;">Rotation</th>
                         </tr>
                     </thead>
@@ -738,10 +739,9 @@ function displaySolutionResults(data) {
         </div>
     `;
 
-    // Add visualization images - now displayed larger in single column
     if (data.images && data.images.solution_visualizations) {
         html += '<div style="margin-top: 30px;">';
-        html += '<h3 style="text-align: center; margin-bottom: 20px;">🧩 Gelöstes Puzzle</h3>';
+        html += '<h3 style="text-align: center; margin-bottom: 20px;">Gelöstes Puzzle</h3>';
         for (const imgFilename of data.images.solution_visualizations) {
             // Skip grid images since we removed them
             if (imgFilename.includes('grid')) {
@@ -1000,11 +1000,11 @@ function displayPieceCleanResults(data) {
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.avg_area || 0)}</div>
-            <div class="label">Avg Area (px²)</div>
+            <div class="label">Durchschnittsfläche (px²)</div>
         </div>
         <div class="stat-card">
             <div class="value">${Math.round(stats.avg_perimeter || 0)}</div>
-            <div class="label">Avg Perimeter (px)</div>
+            <div class="label">Durchschnittsumfang (px)</div>
         </div>
     `;
 
