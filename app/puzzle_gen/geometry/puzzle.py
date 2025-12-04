@@ -1,6 +1,7 @@
 """Puzzle geometry generation and piece placement."""
 import math
 import random
+import numpy as np
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
@@ -158,6 +159,7 @@ class PuzzleGenerator:
 
         if seed is not None:
             random.seed(seed)
+            np.random.seed(seed)  # Seed NumPy's global RNG for reproducibility
 
         self.piece_width = width_px / cols
         self.piece_height = height_px / rows

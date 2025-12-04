@@ -27,7 +27,18 @@ generateBtn.addEventListener('click', async function() {
     cornersBtn.disabled = true;
     matchingBtn.disabled = true;
 
-    showStatus('Generiere 3 Puzzle-Varianten...', 'info');
+    // Read seed from input
+    const seedInput = document.getElementById('seedInput');
+    const seedValue = seedInput.value ? parseInt(seedInput.value) : null;
+
+    // If seed is provided, generate only 1 variant, otherwise generate 3
+    const numVariants = seedValue !== null ? 1 : 3;
+
+    const statusMsg = seedValue !== null
+        ? `Generiere Puzzle mit Seed ${seedValue}...`
+        : 'Generiere 3 Puzzle-Varianten...';
+    showStatus(statusMsg, 'info');
+
     loadingText.textContent = 'Generiere Puzzles (kann 5-15 Sekunden dauern)...';
     loading.classList.add('active');
     generatedVariants.classList.remove('active');
@@ -38,19 +49,28 @@ generateBtn.addEventListener('click', async function() {
     matchResults.classList.remove('active');
 
     try {
-        // Generate 3 variants
+        // Generate variants
         const variants = [];
-        for (let i = 0; i < 3; i++) {
-            loadingText.textContent = `Generiere Puzzle ${i + 1}/3...`;
+        for (let i = 0; i < numVariants; i++) {
+            loadingText.textContent = `Generiere Puzzle ${i + 1}/${numVariants}...`;
+
+            // Build request body
+            const requestBody = {
+                layout: '2x3'
+                // cut_types will be randomly selected on server-side
+            };
+
+            // Add seed if provided
+            if (seedValue !== null) {
+                requestBody.seed = seedValue;
+            }
+
             const response = await fetch('/puzzle-gen/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    layout: '2x3'
-                    // cut_types will be randomly selected on server-side
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const result = await response.json();
@@ -64,7 +84,11 @@ generateBtn.addEventListener('click', async function() {
 
         // Display variants
         displayVariants(variants);
-        showStatus('3 Puzzle-Varianten erfolgreich generiert! Wähle eine aus.', 'success');
+
+        const successMsg = seedValue !== null
+            ? `Puzzle mit Seed ${seedValue} erfolgreich generiert!`
+            : '3 Puzzle-Varianten erfolgreich generiert! Wähle eine aus.';
+        showStatus(successMsg, 'success');
 
     } catch (error) {
         showStatus('Error: ' + error.message, 'error');
@@ -793,8 +817,11 @@ function displayVariants(variants) {
                 <img src="data:image/png;base64,${variant.solution_image}" alt="Solution puzzle" style="width: 100%; border-radius: 5px;">
             </div>
             <div style="text-align: center;">
-                <button class="calibrate-btn btn" data-variant-idx="${idx}" style="background: #2196F3; padding: 8px 16px; font-size: 0.9em;">
+                <button class="calibrate-btn btn" data-variant-idx="${idx}" style="background: #2196F3; padding: 8px 16px; font-size: 0.9em; margin-right: 8px;">
                     📐 Kalibrieren
+                </button>
+                <button class="regenerate-btn btn" data-seed="${metadata.seed}" style="background: #FF9800; padding: 8px 16px; font-size: 0.9em;">
+                    🔄 Mit Seed neu generieren
                 </button>
             </div>
         `;
@@ -891,6 +918,28 @@ function displayVariants(variants) {
                 btn.textContent = '📐 Kalibrieren';
                 btn.disabled = false;
             }
+        });
+
+        // click handler for regenerate button
+        const regenerateBtn = variantCard.querySelector('.regenerate-btn');
+        regenerateBtn.addEventListener('click', async function(e) {
+            e.stopPropagation(); // Prevent variant selection
+
+            const seed = e.target.getAttribute('data-seed');
+
+            // Fill seed input and trigger generation
+            const seedInputElem = document.getElementById('seedInput');
+            seedInputElem.value = seed;
+
+            showStatus(`Regeneriere Puzzle mit Seed ${seed}...`, 'info');
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Wait a bit for scroll, then trigger generation
+            setTimeout(() => {
+                document.getElementById('generateBtn').click();
+            }, 500);
         });
 
         variantsGrid.appendChild(variantCard);

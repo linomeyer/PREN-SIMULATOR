@@ -149,6 +149,16 @@
             cursor: not-allowed;
         }
 
+        #seedInput {
+            width: 200px;
+            margin-left: 10px;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
         .parameters {
             margin-top: 15px;
             display: flex;
