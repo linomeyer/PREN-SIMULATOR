@@ -476,7 +476,7 @@ def solve_puzzle(filename):
                     'row': placed.grid_row,
                     'col': placed.grid_col
                 },
-                'rotation': placed.rotation
+                'rotation': float(placed.rotation)  # Convert numpy float to Python float
             })
 
         # Get grid layout
@@ -487,7 +487,7 @@ def solve_puzzle(filename):
             'solution': {
                 'grid_rows': solution.grid_rows,
                 'grid_cols': solution.grid_cols,
-                'confidence': solution.confidence,
+                'confidence': float(solution.confidence),  # Convert to Python float
                 'pieces_placed': len(solution.placed_pieces),
                 'total_pieces': len(segmenter.pieces),
                 'placed_pieces': placed_pieces,

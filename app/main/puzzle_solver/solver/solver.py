@@ -162,10 +162,14 @@ class PuzzleSolver:
           |       |       |
         (1,0) - (1,1) - (1,2)
         """
-        # Calculate rotation for start corner at (0,0)
-        start_rotation = self._calculate_rotation_for_position(start_corner, (0, 0))
-        if start_rotation is None:
+        # Calculate discrete rotation for start corner at (0,0)
+        discrete_rotation = self._calculate_rotation_for_position(start_corner, (0, 0))
+        if discrete_rotation is None:
             return None  # Can't place this corner at top-left
+
+        # Add base rotation from edge detector to get accurate total rotation
+        base_rotation = self._get_base_rotation_from_detector(start_corner)
+        start_rotation = base_rotation + discrete_rotation
 
         placements = {}
         matches_used = []
@@ -190,12 +194,12 @@ class PuzzleSolver:
 
         # Step 1: Find piece to the right of (0,0) -> position (0,1)
         # The right edge of piece at (0,0) matches with left edge of piece at (0,1)
-        right_edge_after_rotation = self._get_edge_after_rotation('right', start_rotation)
+        right_edge_after_rotation = self._get_edge_after_rotation('right', discrete_rotation)
 
         neighbor_info = self.adjacency.get((start_corner, right_edge_after_rotation))
         if not neighbor_info:
             # Try finding which original edge becomes 'right' after rotation
-            original_right = self._get_original_edge('right', start_rotation)
+            original_right = self._get_original_edge('right', discrete_rotation)
             neighbor_info = self.adjacency.get((start_corner, original_right))
 
         if neighbor_info:
@@ -255,17 +259,22 @@ class PuzzleSolver:
                     neighbor_id, neighbor_edge, match = match_info
                     if neighbor_id not in used_pieces:
                         # Calculate rotation: neighbor_edge should become 'left' after rotation
-                        neighbor_rotation = self._calculate_rotation_to_align_edge(
+                        discrete_rotation = self._calculate_rotation_to_align_edge(
                             neighbor_id, neighbor_edge, 'left'
                         )
 
                         # Also verify flat edges match position requirements
-                        if neighbor_rotation is not None:
+                        if discrete_rotation is not None:
                             expected_flat = self.POSITION_FLAT_EDGES[pos]
-                            actual_flat = self._get_flat_edges_after_rotation(neighbor_id, neighbor_rotation)
+                            actual_flat = self._get_flat_edges_after_rotation(neighbor_id, discrete_rotation)
 
                             if expected_flat == actual_flat:
-                                grid[pos] = {'piece_id': neighbor_id, 'rotation': neighbor_rotation}
+                                # Calculate the accurate base rotation from edge detector
+                                base_rotation = self._get_base_rotation_from_detector(neighbor_id)
+                                # Combine base rotation with discrete 90° steps
+                                accurate_rotation = base_rotation + discrete_rotation
+
+                                grid[pos] = {'piece_id': neighbor_id, 'rotation': accurate_rotation}
                                 used_pieces.add(neighbor_id)
                                 matches_used.append(match)
                                 total_score += match.compatibility_score
@@ -288,17 +297,22 @@ class PuzzleSolver:
                     neighbor_id, neighbor_edge, match = match_info
                     if neighbor_id not in used_pieces:
                         # Calculate rotation: neighbor_edge should become 'top' after rotation
-                        neighbor_rotation = self._calculate_rotation_to_align_edge(
+                        discrete_rotation = self._calculate_rotation_to_align_edge(
                             neighbor_id, neighbor_edge, 'top'
                         )
 
                         # Also verify flat edges match position requirements
-                        if neighbor_rotation is not None:
+                        if discrete_rotation is not None:
                             expected_flat = self.POSITION_FLAT_EDGES[pos]
-                            actual_flat = self._get_flat_edges_after_rotation(neighbor_id, neighbor_rotation)
+                            actual_flat = self._get_flat_edges_after_rotation(neighbor_id, discrete_rotation)
 
                             if expected_flat == actual_flat:
-                                grid[pos] = {'piece_id': neighbor_id, 'rotation': neighbor_rotation}
+                                # Calculate the accurate base rotation from edge detector
+                                base_rotation = self._get_base_rotation_from_detector(neighbor_id)
+                                # Combine base rotation with discrete 90° steps
+                                accurate_rotation = base_rotation + discrete_rotation
+
+                                grid[pos] = {'piece_id': neighbor_id, 'rotation': accurate_rotation}
                                 used_pieces.add(neighbor_id)
                                 matches_used.append(match)
                                 total_score += match.compatibility_score
@@ -329,6 +343,47 @@ class PuzzleSolver:
             matches_used=matches_used,
             confidence=confidence
         )
+
+    def _get_base_rotation_from_detector(self, piece_id: int) -> float:
+        """
+        Get the base rotation for a piece from the edge detector.
+        This is the rotation needed to align the piece's detected orientation.
+        """
+        if not hasattr(self.edge_detector, 'piece_edges'):
+            return 0.0
+
+        edges = self.edge_detector.piece_edges.get(piece_id, {})
+        if 'top' not in edges:
+            return 0.0
+
+        top_edge = edges['top']
+        piece = self.pieces[piece_id]
+        center = np.array(piece.center, dtype=np.float32)
+
+        # Calculate the midpoint of the top edge
+        start = np.array(top_edge.start_point, dtype=np.float32)
+        end = np.array(top_edge.end_point, dtype=np.float32)
+        mid = (start + end) / 2
+
+        # Vector from center to midpoint of top edge - this should point UP (-Y)
+        vec_to_top = mid - center
+
+        # Calculate angle of this vector
+        current_angle = np.degrees(np.arctan2(vec_to_top[1], vec_to_top[0]))
+
+        # The target angle for the top edge is -90° (pointing up)
+        target_angle = -90.0
+
+        # Rotation needed to align
+        rotation = target_angle - current_angle
+
+        # Normalize to [-180, 180]
+        while rotation > 180:
+            rotation -= 360
+        while rotation < -180:
+            rotation += 360
+
+        return rotation
 
     def _get_original_edge(self, target_edge: str, rotation: float) -> str:
         """

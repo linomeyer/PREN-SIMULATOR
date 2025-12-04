@@ -34,13 +34,6 @@ class SolutionVisualizer:
             cv2.imwrite(filepath, assembled_img)
             output_files.append(filename)
 
-        grid_img = self._create_grid_diagram(solution)
-        if grid_img is not None:
-            filename = f"solution_grid_{original_filename}"
-            filepath = os.path.join(self.output_dir, filename)
-            cv2.imwrite(filepath, grid_img)
-            output_files.append(filename)
-
         return output_files
 
     def _create_assembled_puzzle(self, solution: PuzzleSolution,
@@ -73,23 +66,24 @@ class SolutionVisualizer:
                 'height': max_y - min_y
             }
 
-        # Calculate uniform scale
+        # Calculate uniform scale - INCREASED for larger display
         widths = [d['width'] for d in piece_data.values()]
         heights = [d['height'] for d in piece_data.values()]
         avg_width = np.mean(widths)
         avg_height = np.mean(heights)
 
-        target_width = 900
+        # Increased target width for larger visualization
+        target_width = 1400
         scale = target_width / (avg_width * grid_cols * 1.15)
-        scale = min(scale, 0.8)
+        scale = min(scale, 1.2)  # Increased max scale
 
-        margin = 60
-        gap = 20
+        margin = 80  # Increased margin
+        gap = 25  # Slightly increased gap
         cell_width = avg_width * scale + gap
         cell_height = avg_height * scale + gap
 
         img_width = int(margin * 2 + cell_width * grid_cols)
-        img_height = int(margin * 2 + cell_height * grid_rows + 40)
+        img_height = int(margin * 2 + cell_height * grid_rows + 50)  # More space for text
 
         img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255
 
@@ -119,18 +113,22 @@ class SolutionVisualizer:
             cv2.drawContours(img, [final_contour], -1, fill_color, -1)
             cv2.drawContours(img, [final_contour], -1, (40, 40, 40), 2)
 
+            # Larger labels
             label = f"P{piece_id}"
-            cv2.putText(img, label, (int(cell_center_x - 15), int(cell_center_y + 5)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(img, label, (int(cell_center_x - 20), int(cell_center_y + 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
 
-            rot_label = f"{data['placed'].rotation:.0f}°"
-            cv2.putText(img, rot_label, (int(cell_center_x - 15), int(cell_center_y + 25)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+            # Fixed rotation label - use .1f for one decimal place
+            rotation_value = data['placed'].rotation
+            rot_label = f"{rotation_value:.1f}°"
+            cv2.putText(img, rot_label, (int(cell_center_x - 20), int(cell_center_y + 30)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
 
-        cv2.putText(img, f"Grid: {grid_rows}x{grid_cols}", (10, img_height - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1, cv2.LINE_AA)
-        cv2.putText(img, f"Confidence: {solution.confidence:.1%}", (130, img_height - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1, cv2.LINE_AA)
+        # Larger footer text
+        cv2.putText(img, f"Grid: {grid_rows}x{grid_cols}", (10, img_height - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1, cv2.LINE_AA)
+        cv2.putText(img, f"Confidence: {solution.confidence:.1%}", (160, img_height - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1, cv2.LINE_AA)
 
         return img
 
@@ -138,19 +136,16 @@ class SolutionVisualizer:
         """
         Align a piece so its edges are in the correct positions for the grid.
 
-        Strategy: Use the detected 'top' edge to find the piece's current orientation,
-        then apply the solver's rotation on top of that.
+        The solver_rotation already contains the full rotation needed (base + discrete),
+        so we just apply it directly.
         """
         contour = piece.contour.copy().astype(np.float32).reshape(-1, 2)
         center = np.array(piece.center, dtype=np.float32)
         centered = contour - center
 
-        # Calculate the base rotation needed to make the piece's detected "top" edge
-        # actually point upward (negative Y direction)
-        base_rotation = self._calculate_base_rotation(piece_id, center)
-
-        # Total rotation = base alignment + solver's rotation
-        total_rotation = base_rotation + solver_rotation
+        # The solver_rotation already includes both base rotation and discrete 90° steps
+        # So we just apply it directly without calculating base_rotation again
+        total_rotation = solver_rotation
 
         # Apply rotation
         angle_rad = np.radians(total_rotation)
@@ -206,48 +201,3 @@ class SolutionVisualizer:
             rotation += 360
 
         return rotation
-
-    def _create_grid_diagram(self, solution: PuzzleSolution) -> np.ndarray:
-        """Create a simple grid diagram showing piece IDs."""
-        grid_rows = 2
-        grid_cols = 3
-
-        cell_size = 70
-        margin = 25
-
-        img_width = cell_size * grid_cols + 2 * margin
-        img_height = cell_size * grid_rows + 2 * margin + 25
-
-        img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255
-
-        cv2.putText(img, "LAYOUT", (img_width // 2 - 30, 18),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-
-        grid = solution.get_grid_layout()
-
-        for row in range(grid_rows):
-            for col in range(grid_cols):
-                x = margin + col * cell_size
-                y = 25 + row * cell_size
-
-                cv2.rectangle(img, (x, y), (x + cell_size, y + cell_size), (0, 0, 0), 1)
-
-                piece_id = grid[row][col] if row < len(grid) and col < len(grid[row]) else None
-
-                if piece_id is not None:
-                    placed = solution.get_piece_at(row, col)
-
-                    text = f"P{piece_id}"
-                    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-                    text_x = x + (cell_size - text_size[0]) // 2
-                    text_y = y + cell_size // 2 + 5
-
-                    cv2.putText(img, text, (text_x, text_y),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-
-                    if placed:
-                        rot_text = f"{placed.rotation:.0f}°"
-                        cv2.putText(img, rot_text, (x + 3, y + cell_size - 4),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.25, (100, 100, 100), 1, cv2.LINE_AA)
-
-        return img

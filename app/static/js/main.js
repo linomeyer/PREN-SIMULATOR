@@ -743,7 +743,7 @@ function displaySolutionResults(data) {
             <tr>
                 <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">P${piece.piece_id}</td>
                 <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">(${piece.grid_position.row}, ${piece.grid_position.col})</td>
-                <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">${piece.rotation.toFixed(0)}°</td>
+                <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">${piece.rotation.toFixed(1)}°</td>
             </tr>
         `;
     }
@@ -755,21 +755,24 @@ function displaySolutionResults(data) {
         </div>
     `;
 
-    // Add visualization images
+    // Add visualization images - now displayed larger in single column
     if (data.images && data.images.solution_visualizations) {
-        html += '<div class="images-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; margin-top: 20px;">';
+        html += '<div style="margin-top: 30px;">';
+        html += '<h3 style="text-align: center; margin-bottom: 20px;">🧩 Gelöstes Puzzle</h3>';
         for (const imgFilename of data.images.solution_visualizations) {
+            // Skip grid images since we removed them
+            if (imgFilename.includes('grid')) {
+                continue;
+            }
             html += `
-                <div class="image-item piece-card" style="text-align: center;">
+                <div class="image-item piece-card" style="text-align: center; max-width: 100%; margin: 0 auto 20px;">
                     <img src="/output/${imgFilename}" alt="Solution visualization" 
-                         style="width: 100%; cursor: pointer;"
+                         style="width: 100%; max-width: none; cursor: pointer;"
                          onclick="window.open('/output/${imgFilename}', '_blank')">
-                    <p style="margin-top: 10px; font-weight: bold;">
-                        ${imgFilename.includes('assembled') ? 'Zusammengesetztes Puzzle' : 
-                          imgFilename.includes('grid') ? 'Gitter-Diagramm' : 
-                          imgFilename.includes('rotations') ? 'Rotations-Guide' : 'Visualisierung'}
+                    <p style="margin-top: 15px; font-weight: bold; font-size: 1.1em;">
+                        ${imgFilename.includes('assembled') ? 'Zusammengesetztes Puzzle' : 'Visualisierung'}
                     </p>
-                    <p style="color: #666; font-size: 0.9em;">Klicke zum Vergrößern</p>
+                    <p style="color: #666; font-size: 0.95em;">Klicke zum Vergrößern</p>
                 </div>
             `;
         }
