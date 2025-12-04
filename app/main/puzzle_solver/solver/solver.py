@@ -1,15 +1,20 @@
 """
 Puzzle solver that assembles puzzle pieces using edge matches.
 
-This module takes the edge matches from EdgeMatcher and determines:
-1. The relative positions of all pieces
-2. The rotation needed for each piece
-3. The final solved puzzle layout
+For a 2x3 grid:
+- 4 corner pieces (2 flat edges) at (0,0), (0,2), (1,0), (1,2)
+- 2 middle border pieces (1 flat edge) at (0,1), (1,1)
+
+The solver uses edge matches to determine:
+1. Which specific corner goes to which corner position
+2. Which middle border piece goes top vs bottom
+3. The exact rotation for each piece
 """
 
 import numpy as np
 from typing import List, Dict, Tuple, Optional, Set
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from itertools import permutations
 
 from app.main.puzzle_solver.edge_matching.edge_matcher import EdgeMatcher, EdgeMatch
 from app.main.puzzle_solver.edge_detection.edge_detector import EdgeDetector
@@ -22,8 +27,8 @@ class PlacedPiece:
     piece_id: int
     grid_row: int
     grid_col: int
-    rotation: float  # Rotation in degrees to apply to the piece
-    piece: PuzzlePiece  # Reference to the original piece
+    rotation: float  # Rotation in degrees
+    piece: PuzzlePiece
 
     def __repr__(self):
         return f"PlacedPiece(id={self.piece_id}, pos=({self.grid_row}, {self.grid_col}), rot={self.rotation:.1f}°)"
@@ -36,7 +41,7 @@ class PuzzleSolution:
     grid_rows: int
     grid_cols: int
     matches_used: List[EdgeMatch]
-    confidence: float  # Overall solution confidence (0-1)
+    confidence: float
 
     def get_piece_at(self, row: int, col: int) -> Optional[PlacedPiece]:
         """Get the piece at a specific grid position."""
@@ -56,374 +61,350 @@ class PuzzleSolution:
 
 class PuzzleSolver:
     """
-    Solves puzzles by assembling pieces based on edge matches.
+    Solves 2x3 puzzles using edge matches to determine piece positions.
 
     Strategy:
-    1. Identify corner pieces (2 flat edges) - these anchor the puzzle
-    2. Identify border pieces (1 flat edge) - these form the frame
-    3. Start from a corner and build outward
-    4. Use edge matches to determine which pieces connect
-    5. Calculate rotations needed to align pieces
+    1. Build an adjacency graph from edge matches
+    2. Place pieces by following the match connections
+    3. Determine rotations based on which edges are matched
     """
 
-    # Edge direction mappings
-    OPPOSITE_EDGE = {
-        'top': 'bottom',
-        'bottom': 'top',
-        'left': 'right',
-        'right': 'left'
-    }
+    GRID_ROWS = 2
+    GRID_COLS = 3
 
-    # Grid offsets for each edge direction
-    EDGE_OFFSETS = {
-        'top': (-1, 0),    # piece above
-        'bottom': (1, 0),  # piece below
-        'left': (0, -1),   # piece to the left
-        'right': (0, 1)    # piece to the right
+    # Required flat edges for each position
+    POSITION_FLAT_EDGES = {
+        (0, 0): {'top', 'left'},
+        (0, 1): {'top'},
+        (0, 2): {'top', 'right'},
+        (1, 0): {'bottom', 'left'},
+        (1, 1): {'bottom'},
+        (1, 2): {'bottom', 'right'},
     }
 
     def __init__(self, edge_matcher: EdgeMatcher, pieces: List[PuzzlePiece]):
-        """
-        Initialize the puzzle solver.
-
-        Args:
-            edge_matcher: EdgeMatcher with computed matches
-            pieces: List of extracted puzzle pieces
-        """
         self.edge_matcher = edge_matcher
         self.pieces = pieces
         self.edge_detector = edge_matcher.edge_detector
-
-        # Build match lookup for quick access
-        self.match_lookup = self._build_match_lookup()
-
-        # Identify piece types
         self.border_info = edge_matcher.identify_border_pieces()
 
-    def _build_match_lookup(self) -> Dict[Tuple[int, str], EdgeMatch]:
-        """
-        Build a lookup dictionary for finding matches by piece_id and edge_type.
+        # Build adjacency info from matches
+        self.adjacency = self._build_adjacency_from_matches()
 
-        Returns:
-            Dict mapping (piece_id, edge_type) to EdgeMatch
+    def _build_adjacency_from_matches(self) -> Dict[Tuple[int, str], Tuple[int, str, EdgeMatch]]:
         """
-        lookup = {}
+        Build adjacency lookup from edge matches.
+
+        Returns dict mapping (piece_id, edge_type) -> (other_piece_id, other_edge_type, match)
+        """
+        adjacency = {}
+
         for match in self.edge_matcher.matches:
-            key1 = (match.edge1.piece_id, match.edge1.edge_type)
-            key2 = (match.edge2.piece_id, match.edge2.edge_type)
-            lookup[key1] = match
-            lookup[key2] = match
-        return lookup
+            p1_id = match.edge1.piece_id
+            p1_edge = match.edge1.edge_type
+            p2_id = match.edge2.piece_id
+            p2_edge = match.edge2.edge_type
+
+            adjacency[(p1_id, p1_edge)] = (p2_id, p2_edge, match)
+            adjacency[(p2_id, p2_edge)] = (p1_id, p1_edge, match)
+
+        return adjacency
 
     def solve(self) -> Optional[PuzzleSolution]:
-        """
-        Solve the puzzle by placing all pieces in their correct positions.
+        """Solve the puzzle using edge matches to build the grid."""
+        print(f"Solving puzzle: {len(self.pieces)} pieces, grid: {self.GRID_ROWS}x{self.GRID_COLS}")
+        print(f"Available matches: {len(self.edge_matcher.matches)}")
 
-        Returns:
-            PuzzleSolution if successful, None if puzzle cannot be solved
-        """
-        num_pieces = len(self.pieces)
+        # Print adjacency info
+        print("Adjacency from matches:")
+        for (pid, edge), (other_pid, other_edge, match) in self.adjacency.items():
+            print(f"  P{pid}.{edge} <-> P{other_pid}.{other_edge}")
 
-        # Determine grid dimensions
-        grid_rows, grid_cols = self._estimate_grid_size(num_pieces)
+        # Identify corners and middles
+        corners = [pid for pid, info in self.border_info.items() if info['is_corner']]
+        middles = [pid for pid, info in self.border_info.items() if info['is_middle_border']]
 
-        print(f"Solving puzzle: {num_pieces} pieces, estimated grid: {grid_rows}x{grid_cols}")
-
-        # Find corner pieces (should have 2 flat edges)
-        corners = self._find_corner_pieces()
-        if not corners:
-            print("Error: No corner pieces found!")
+        if len(corners) != 4:
+            print(f"Error: Expected 4 corner pieces, found {len(corners)}: {corners}")
+            return None
+        if len(middles) != 2:
+            print(f"Error: Expected 2 middle pieces, found {len(middles)}: {middles}")
             return None
 
-        print(f"Found {len(corners)} corner pieces: {corners}")
+        print(f"Corner pieces: {corners}")
+        print(f"Middle pieces: {middles}")
 
-        # Start from the first corner and build the puzzle
-        solution = self._build_solution(corners[0], grid_rows, grid_cols)
+        # Try building from each corner as top-left
+        best_solution = None
+        best_score = -1
 
-        if solution:
-            print(f"Solution found! Placed {len(solution.placed_pieces)} pieces")
-            print(f"Solution confidence: {solution.confidence:.2%}")
+        for start_corner in corners:
+            solution = self._build_from_corner(start_corner, corners, middles)
+            if solution and solution.confidence > best_score:
+                best_score = solution.confidence
+                best_solution = solution
+
+        if best_solution:
+            print(f"Solution found! Placed {len(best_solution.placed_pieces)} pieces")
+            print(f"Solution confidence: {best_solution.confidence:.2%}")
         else:
-            print("Could not find a complete solution")
+            print("Could not find a valid solution")
 
-        return solution
+        return best_solution
 
-    def _estimate_grid_size(self, num_pieces: int) -> Tuple[int, int]:
+    def _build_from_corner(self, start_corner: int, corners: List[int],
+                           middles: List[int]) -> Optional[PuzzleSolution]:
         """
-        Estimate the grid dimensions based on number of pieces.
+        Try to build the puzzle starting from a specific corner as top-left.
 
-        For 6 pieces: 2x3 or 3x2
-        For 4 pieces: 2x2
-        For 9 pieces: 3x3
-        etc.
+        Grid layout:
+        (0,0) - (0,1) - (0,2)
+          |       |       |
+        (1,0) - (1,1) - (1,2)
         """
-        # Common puzzle dimensions
-        common_grids = {
-            4: (2, 2),
-            6: (2, 3),
-            8: (2, 4),
-            9: (3, 3),
-            12: (3, 4),
-            16: (4, 4),
-            20: (4, 5),
-            24: (4, 6),
-            25: (5, 5)
+        # Calculate rotation for start corner at (0,0)
+        start_rotation = self._calculate_rotation_for_position(start_corner, (0, 0))
+        if start_rotation is None:
+            return None  # Can't place this corner at top-left
+
+        placements = {}
+        matches_used = []
+        total_score = 0.0
+
+        # Place starting corner at (0,0)
+        placements[(0, 0)] = {
+            'piece_id': start_corner,
+            'rotation': start_rotation
         }
 
-        if num_pieces in common_grids:
-            return common_grids[num_pieces]
+        # Get flat edges for start corner (after rotation)
+        start_flat = self.border_info[start_corner]['flat_edges']
 
-        # For other counts, find factors closest to square
-        sqrt_n = int(np.sqrt(num_pieces))
-        for rows in range(sqrt_n, 0, -1):
-            if num_pieces % rows == 0:
-                cols = num_pieces // rows
-                return (rows, cols)
+        # Find non-flat edges of start corner (these connect to neighbors)
+        start_edges = self.edge_detector.piece_edges[start_corner]
 
-        # Fallback
-        return (1, num_pieces)
+        # Build grid by following matches
+        # From (0,0), go right to find (0,1), then continue to (0,2)
+        # From (0,0), go down to find (1,0)
+        # etc.
 
-    def _find_corner_pieces(self) -> List[int]:
-        """Find pieces that are corners (have 2 flat edges)."""
-        corners = []
-        for piece_id, info in self.border_info.items():
-            if info['is_corner'] and info['num_flat_edges'] >= 2:
-                corners.append(piece_id)
-        return corners
+        # Step 1: Find piece to the right of (0,0) -> position (0,1)
+        # The right edge of piece at (0,0) matches with left edge of piece at (0,1)
+        right_edge_after_rotation = self._get_edge_after_rotation('right', start_rotation)
 
-    def _find_border_pieces(self) -> List[int]:
-        """Find pieces that are on the border but not corners (have 1 flat edge)."""
-        border = []
-        for piece_id, info in self.border_info.items():
-            if info['is_border'] and info['num_flat_edges'] == 1:
-                border.append(piece_id)
-        return border
+        neighbor_info = self.adjacency.get((start_corner, right_edge_after_rotation))
+        if not neighbor_info:
+            # Try finding which original edge becomes 'right' after rotation
+            original_right = self._get_original_edge('right', start_rotation)
+            neighbor_info = self.adjacency.get((start_corner, original_right))
 
-    def _find_interior_pieces(self) -> List[int]:
-        """Find pieces that are interior (have 0 flat edges)."""
-        interior = []
-        for piece_id, info in self.border_info.items():
-            if not info['is_border']:
-                interior.append(piece_id)
-        return interior
-
-    def _build_solution(self, start_corner: int, grid_rows: int, grid_cols: int) -> Optional[PuzzleSolution]:
-        """
-        Build the puzzle solution starting from a corner piece.
-
-        Args:
-            start_corner: Piece ID of the starting corner
-            grid_rows: Number of rows in the grid
-            grid_cols: Number of columns in the grid
-
-        Returns:
-            PuzzleSolution if successful, None otherwise
-        """
-        placed: Dict[int, PlacedPiece] = {}  # piece_id -> PlacedPiece
-        grid: Dict[Tuple[int, int], int] = {}  # (row, col) -> piece_id
-        matches_used: List[EdgeMatch] = []
-
-        # Determine which corner position this piece should be at
-        # based on which edges are flat
-        flat_edges = self.border_info[start_corner]['flat_edges']
-
-        # Calculate the rotation needed to put flat edges at top-left corner
-        rotation, corner_pos = self._get_corner_placement(flat_edges, grid_rows, grid_cols)
-
-        # Place the starting corner
-        start_placed = PlacedPiece(
-            piece_id=start_corner,
-            grid_row=corner_pos[0],
-            grid_col=corner_pos[1],
-            rotation=rotation,
-            piece=self.pieces[start_corner]
-        )
-
-        placed[start_corner] = start_placed
-        grid[corner_pos] = start_corner
-
-        print(f"Placed starting corner piece {start_corner} at {corner_pos} with rotation {rotation}°")
-
-        # Use BFS to place remaining pieces
-        to_process = [start_corner]
-        processed = {start_corner}
-
-        while to_process:
-            current_id = to_process.pop(0)
-            current_placed = placed[current_id]
-
-            # Try to find matches for each non-flat edge
-            edges = self.edge_detector.piece_edges.get(current_id, {})
-
-            for edge_type, edge in edges.items():
-                # Skip flat edges
-                if edge.get_edge_type_classification() == 'flat':
-                    continue
-
-                # Find match for this edge
-                match = self.match_lookup.get((current_id, edge_type))
-                if not match:
-                    continue
-
-                # Get the other piece in the match
-                if match.edge1.piece_id == current_id:
-                    other_piece_id = match.edge2.piece_id
-                    other_edge_type = match.edge2.edge_type
-                else:
-                    other_piece_id = match.edge1.piece_id
-                    other_edge_type = match.edge1.edge_type
-
-                # Skip if already placed
-                if other_piece_id in processed:
-                    continue
-
-                # Calculate position and rotation for the new piece
-                new_pos, new_rotation = self._calculate_neighbor_placement(
-                    current_placed, edge_type, other_edge_type, match
-                )
-
-                # Check if position is valid and not occupied
-                if new_pos in grid:
-                    continue  # Position already taken
-
-                if not (0 <= new_pos[0] < grid_rows and 0 <= new_pos[1] < grid_cols):
-                    continue  # Out of bounds
-
-                # Place the new piece
-                new_placed = PlacedPiece(
-                    piece_id=other_piece_id,
-                    grid_row=new_pos[0],
-                    grid_col=new_pos[1],
-                    rotation=new_rotation,
-                    piece=self.pieces[other_piece_id]
-                )
-
-                placed[other_piece_id] = new_placed
-                grid[new_pos] = other_piece_id
+        if neighbor_info:
+            neighbor_id, neighbor_edge, match = neighbor_info
+            # Calculate rotation for neighbor: its 'neighbor_edge' should become 'left'
+            neighbor_rotation = self._calculate_rotation_to_align_edge(neighbor_id, neighbor_edge, 'left')
+            if neighbor_rotation is not None:
+                placements[(0, 1)] = {
+                    'piece_id': neighbor_id,
+                    'rotation': neighbor_rotation
+                }
                 matches_used.append(match)
-                processed.add(other_piece_id)
-                to_process.append(other_piece_id)
+                total_score += match.compatibility_score
 
-                print(f"Placed piece {other_piece_id} at {new_pos} with rotation {new_rotation:.1f}°")
+        # Continue building the grid...
+        # This is complex - let me use a more systematic approach
 
-        # Calculate confidence based on how many pieces were placed
-        confidence = len(placed) / len(self.pieces)
+        return self._systematic_build(start_corner, start_rotation)
+
+    def _systematic_build(self, start_piece: int, start_rotation: float) -> Optional[PuzzleSolution]:
+        """
+        Systematically build the grid starting from top-left corner.
+        """
+        grid = {}  # (row, col) -> {'piece_id': int, 'rotation': float}
+        used_pieces = set()
+        matches_used = []
+        total_score = 0.0
+
+        # Place starting piece at (0, 0)
+        grid[(0, 0)] = {'piece_id': start_piece, 'rotation': start_rotation}
+        used_pieces.add(start_piece)
+
+        # Process positions in order: row by row, left to right
+        positions = [(0, 1), (0, 2), (1, 0), (1, 1), (1, 2)]
+
+        for pos in positions:
+            row, col = pos
+
+            # Find which neighbor we can use to determine this position
+            # Prefer left neighbor for horizontal connection, or top neighbor for vertical
+
+            placed = False
+
+            # Try to place based on left neighbor
+            if col > 0 and (row, col - 1) in grid:
+                left_info = grid[(row, col - 1)]
+                left_piece = left_info['piece_id']
+                left_rotation = left_info['rotation']
+
+                # Find which edge of left_piece is its "right" edge after rotation
+                original_right_edge = self._get_original_edge('right', left_rotation)
+
+                # Look up what this edge matches to
+                match_info = self.adjacency.get((left_piece, original_right_edge))
+
+                if match_info:
+                    neighbor_id, neighbor_edge, match = match_info
+                    if neighbor_id not in used_pieces:
+                        # Calculate rotation: neighbor_edge should become 'left' after rotation
+                        neighbor_rotation = self._calculate_rotation_to_align_edge(
+                            neighbor_id, neighbor_edge, 'left'
+                        )
+
+                        # Also verify flat edges match position requirements
+                        if neighbor_rotation is not None:
+                            expected_flat = self.POSITION_FLAT_EDGES[pos]
+                            actual_flat = self._get_flat_edges_after_rotation(neighbor_id, neighbor_rotation)
+
+                            if expected_flat == actual_flat:
+                                grid[pos] = {'piece_id': neighbor_id, 'rotation': neighbor_rotation}
+                                used_pieces.add(neighbor_id)
+                                matches_used.append(match)
+                                total_score += match.compatibility_score
+                                placed = True
+                                print(f"  Placed P{neighbor_id} at {pos} (from left neighbor P{left_piece})")
+
+            # Try to place based on top neighbor if not placed yet
+            if not placed and row > 0 and (row - 1, col) in grid:
+                top_info = grid[(row - 1, col)]
+                top_piece = top_info['piece_id']
+                top_rotation = top_info['rotation']
+
+                # Find which edge of top_piece is its "bottom" edge after rotation
+                original_bottom_edge = self._get_original_edge('bottom', top_rotation)
+
+                # Look up what this edge matches to
+                match_info = self.adjacency.get((top_piece, original_bottom_edge))
+
+                if match_info:
+                    neighbor_id, neighbor_edge, match = match_info
+                    if neighbor_id not in used_pieces:
+                        # Calculate rotation: neighbor_edge should become 'top' after rotation
+                        neighbor_rotation = self._calculate_rotation_to_align_edge(
+                            neighbor_id, neighbor_edge, 'top'
+                        )
+
+                        # Also verify flat edges match position requirements
+                        if neighbor_rotation is not None:
+                            expected_flat = self.POSITION_FLAT_EDGES[pos]
+                            actual_flat = self._get_flat_edges_after_rotation(neighbor_id, neighbor_rotation)
+
+                            if expected_flat == actual_flat:
+                                grid[pos] = {'piece_id': neighbor_id, 'rotation': neighbor_rotation}
+                                used_pieces.add(neighbor_id)
+                                matches_used.append(match)
+                                total_score += match.compatibility_score
+                                placed = True
+                                print(f"  Placed P{neighbor_id} at {pos} (from top neighbor P{top_piece})")
+
+            if not placed:
+                print(f"  Could not place piece at {pos}")
+                return None
+
+        # Build solution
+        placements = []
+        for pos, info in grid.items():
+            placements.append(PlacedPiece(
+                piece_id=info['piece_id'],
+                grid_row=pos[0],
+                grid_col=pos[1],
+                rotation=info['rotation'],
+                piece=self.pieces[info['piece_id']]
+            ))
+
+        confidence = total_score / len(matches_used) if matches_used else 0.0
 
         return PuzzleSolution(
-            placed_pieces=list(placed.values()),
-            grid_rows=grid_rows,
-            grid_cols=grid_cols,
+            placed_pieces=placements,
+            grid_rows=self.GRID_ROWS,
+            grid_cols=self.GRID_COLS,
             matches_used=matches_used,
             confidence=confidence
         )
 
-    def _get_corner_placement(self, flat_edges: List[str], grid_rows: int, grid_cols: int) -> Tuple[float, Tuple[int, int]]:
+    def _get_original_edge(self, target_edge: str, rotation: float) -> str:
         """
-        Determine the rotation and position for a corner piece.
+        Given a target edge position and rotation, find which original edge
+        ends up at that position.
 
-        Args:
-            flat_edges: List of edge types that are flat
-            grid_rows: Number of rows
-            grid_cols: Number of columns
+        E.g., if rotation=90°, what was originally 'left' becomes 'top'.
+        So if target='top' and rotation=90°, original='left'.
 
-        Returns:
-            Tuple of (rotation_degrees, (row, col))
-        """
-        flat_set = set(flat_edges)
-
-        # Top-left corner: flat on top and left
-        if 'top' in flat_set and 'left' in flat_set:
-            return (0.0, (0, 0))
-
-        # Top-right corner: flat on top and right
-        if 'top' in flat_set and 'right' in flat_set:
-            return (0.0, (0, grid_cols - 1))
-
-        # Bottom-left corner: flat on bottom and left
-        if 'bottom' in flat_set and 'left' in flat_set:
-            return (0.0, (grid_rows - 1, 0))
-
-        # Bottom-right corner: flat on bottom and right
-        if 'bottom' in flat_set and 'right' in flat_set:
-            return (0.0, (grid_rows - 1, grid_cols - 1))
-
-        # If we can't determine, default to top-left with rotation
-        # This means we need to rotate the piece
-        if 'top' in flat_set:
-            if 'bottom' in flat_set:
-                # This is a border piece, not a corner
-                return (0.0, (0, 0))
-            # Rotate to get another edge to be left
-            return (90.0, (0, 0))
-
-        # Default: place at top-left, will need rotation
-        return (0.0, (0, 0))
-
-    def _calculate_neighbor_placement(self, current: PlacedPiece, current_edge: str,
-                                      neighbor_edge: str, match: EdgeMatch) -> Tuple[Tuple[int, int], float]:
-        """
-        Calculate the position and rotation for a neighboring piece.
-
-        Args:
-            current: The already-placed piece
-            current_edge: The edge of the current piece that connects
-            neighbor_edge: The edge of the neighbor piece that connects
-            match: The EdgeMatch between these pieces
-
-        Returns:
-            Tuple of ((row, col), rotation_degrees)
-        """
-        # Calculate the actual edge direction after current piece's rotation
-        rotated_edge = self._rotate_edge_type(current_edge, current.rotation)
-
-        # Get grid offset for this edge
-        offset = self.EDGE_OFFSETS[rotated_edge]
-        new_row = current.grid_row + offset[0]
-        new_col = current.grid_col + offset[1]
-
-        # Calculate rotation for the neighbor piece
-        # The neighbor's connecting edge should face the opposite direction
-        required_neighbor_edge = self.OPPOSITE_EDGE[rotated_edge]
-
-        # Calculate how much to rotate the neighbor so its edge aligns
-        rotation = self._calculate_rotation_for_alignment(neighbor_edge, required_neighbor_edge)
-
-        return ((new_row, new_col), rotation)
-
-    def _rotate_edge_type(self, edge_type: str, rotation: float) -> str:
-        """
-        Get the edge type after rotation.
-
-        Args:
-            edge_type: Original edge type ('top', 'right', 'bottom', 'left')
-            rotation: Rotation in degrees (clockwise)
-
-        Returns:
-            New edge type after rotation
+        Rotation is clockwise.
         """
         edges = ['top', 'right', 'bottom', 'left']
-        idx = edges.index(edge_type)
-
-        # Each 90° clockwise rotation shifts the edge index
+        target_idx = edges.index(target_edge)
         steps = int(round(rotation / 90.0)) % 4
-        new_idx = (idx + steps) % 4
+        # Reverse the rotation to find original
+        original_idx = (target_idx - steps) % 4
+        return edges[original_idx]
 
+    def _get_edge_after_rotation(self, original_edge: str, rotation: float) -> str:
+        """
+        Given an original edge and rotation, find where it ends up.
+
+        Rotation is clockwise.
+        """
+        edges = ['top', 'right', 'bottom', 'left']
+        original_idx = edges.index(original_edge)
+        steps = int(round(rotation / 90.0)) % 4
+        new_idx = (original_idx + steps) % 4
         return edges[new_idx]
 
-    def _calculate_rotation_for_alignment(self, current_edge: str, required_edge: str) -> float:
+    def _calculate_rotation_to_align_edge(self, piece_id: int, edge: str, target_position: str) -> Optional[float]:
         """
-        Calculate the rotation needed to move current_edge to required_edge position.
+        Calculate rotation needed so that 'edge' ends up at 'target_position'.
 
-        Args:
-            current_edge: Current edge position ('top', 'right', 'bottom', 'left')
-            required_edge: Required edge position
-
-        Returns:
-            Rotation in degrees (clockwise)
+        E.g., if edge='bottom' and target='left', we need to rotate so bottom becomes left.
         """
         edges = ['top', 'right', 'bottom', 'left']
-        current_idx = edges.index(current_edge)
-        required_idx = edges.index(required_edge)
+        edge_idx = edges.index(edge)
+        target_idx = edges.index(target_position)
 
-        steps = (required_idx - current_idx) % 4
+        steps = (target_idx - edge_idx) % 4
         return steps * 90.0
+
+    def _get_flat_edges_after_rotation(self, piece_id: int, rotation: float) -> Set[str]:
+        """Get the set of flat edges after applying rotation."""
+        original_flat = set(self.border_info[piece_id]['flat_edges'])
+        return self._rotate_edge_set(original_flat, rotation)
+
+    def _calculate_rotation_for_position(self, piece_id: int, position: Tuple[int, int]) -> Optional[float]:
+        """
+        Calculate the rotation needed for a piece at a given position.
+
+        The piece must be rotated so its flat edges align with the grid boundaries.
+        """
+        flat_edges = set(self.border_info[piece_id]['flat_edges'])
+        required_flat = self.POSITION_FLAT_EDGES[position]
+
+        # Try all 4 rotations
+        for rotation_steps in range(4):
+            rotation = rotation_steps * 90.0
+            rotated_flat = self._rotate_edge_set(flat_edges, rotation)
+
+            if rotated_flat == required_flat:
+                return rotation
+
+        return None  # No valid rotation found
+
+    def _rotate_edge_set(self, edges: Set[str], rotation: float) -> Set[str]:
+        """Rotate a set of edge types by the given rotation."""
+        edge_list = ['top', 'right', 'bottom', 'left']
+        steps = int(round(rotation / 90.0)) % 4
+
+        rotated = set()
+        for edge in edges:
+            idx = edge_list.index(edge)
+            new_idx = (idx + steps) % 4
+            rotated.add(edge_list[new_idx])
+
+        return rotated

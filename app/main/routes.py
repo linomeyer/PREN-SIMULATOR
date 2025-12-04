@@ -461,10 +461,10 @@ def solve_puzzle(filename):
                 'error': 'Could not solve puzzle - no valid solution found'
             }), 400
 
-        # Visualize solution
+        # Visualize solution - pass edge_detector for proper orientation
         solution_visualizer = SolutionVisualizer(output_dir=str(OUTPUT_FOLDER))
         solution_images = solution_visualizer.visualize_solution(
-            solution, segmenter.pieces, filename
+            solution, segmenter.pieces, filename, edge_detector=edge_detector
         )
 
         # Prepare solution info

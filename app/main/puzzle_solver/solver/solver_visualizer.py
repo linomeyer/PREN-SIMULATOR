@@ -1,47 +1,32 @@
-# File: app/main/puzzle_solver/puzzle_solving/puzzle_solver_visualizer.py
-"""
-Visualizer for puzzle solutions.
-
-Creates visual representations of the solved puzzle showing:
-1. How all pieces fit together
-2. The grid layout
-3. Individual pieces with their rotations applied
-"""
-
 import os
-from typing import List, Tuple, Optional
+from typing import List, Optional, Dict, Tuple
 
 import cv2
 import numpy as np
 
+from app.main.puzzle_solver.piece_extraction.extractor import PuzzlePiece
 from app.main.puzzle_solver.solver.solver import PuzzleSolution, PlacedPiece
-from app.main.puzzle_solver.piece_extraction.extractor import PuzzlePiece, PieceSegmenter
+from app.main.puzzle_solver.edge_detection.edge_detector import EdgeDetector
 
 
 class SolutionVisualizer:
-    """Visualizes puzzle solutions."""
+    """Visualizes puzzle solutions with pieces properly aligned and touching."""
 
-    def __init__(self, output_dir: str = 'app/static/output'):
+    def __init__(self, output_dir: str = 'app/static/output', edge_detector: EdgeDetector = None):
         self.output_dir = output_dir
+        self.edge_detector = edge_detector
         os.makedirs(output_dir, exist_ok=True)
 
     def visualize_solution(self, solution: PuzzleSolution,
                            pieces: List[PuzzlePiece],
-                           original_filename: str) -> List[str]:
-        """
-        Create visualizations of the puzzle solution.
+                           original_filename: str,
+                           edge_detector: EdgeDetector = None) -> List[str]:
+        """Create visualizations of the puzzle solution."""
+        if edge_detector:
+            self.edge_detector = edge_detector
 
-        Args:
-            solution: PuzzleSolution object
-            pieces: List of PuzzlePiece objects
-            original_filename: Original filename for naming output
-
-        Returns:
-            List of output filenames
-        """
         output_files = []
 
-        # 1. Create assembled puzzle image
         assembled_img = self._create_assembled_puzzle(solution, pieces)
         if assembled_img is not None:
             filename = f"solution_assembled_{original_filename}"
@@ -49,7 +34,6 @@ class SolutionVisualizer:
             cv2.imwrite(filepath, assembled_img)
             output_files.append(filename)
 
-        # 2. Create grid layout diagram
         grid_img = self._create_grid_diagram(solution)
         if grid_img is not None:
             filename = f"solution_grid_{original_filename}"
@@ -57,288 +41,213 @@ class SolutionVisualizer:
             cv2.imwrite(filepath, grid_img)
             output_files.append(filename)
 
-        # 3. Create piece rotation guide
-        rotation_img = self._create_rotation_guide(solution, pieces)
-        if rotation_img is not None:
-            filename = f"solution_rotations_{original_filename}"
-            filepath = os.path.join(self.output_dir, filename)
-            cv2.imwrite(filepath, rotation_img)
-            output_files.append(filename)
-
         return output_files
 
     def _create_assembled_puzzle(self, solution: PuzzleSolution,
-                                  pieces: List[PuzzlePiece]) -> Optional[np.ndarray]:
-        """
-        Create an image showing all pieces assembled together.
-
-        Args:
-            solution: PuzzleSolution object
-            pieces: List of PuzzlePiece objects
-
-        Returns:
-            Assembled puzzle image
-        """
+                                 pieces: List[PuzzlePiece]) -> Optional[np.ndarray]:
+        """Create an image showing all pieces assembled in their solved positions."""
         if not solution.placed_pieces:
             return None
 
-        # Calculate cell size based on largest piece
-        max_width = 0
-        max_height = 0
+        grid_rows = 2
+        grid_cols = 3
+
+        piece_data = {}
+
         for placed in solution.placed_pieces:
             piece = pieces[placed.piece_id]
-            _, _, w, h = piece.bbox
-            # Account for rotation
-            if abs(placed.rotation % 180) > 45:
-                w, h = h, w
-            max_width = max(max_width, w)
-            max_height = max(max_height, h)
 
-        # Add padding
-        cell_width = int(max_width * 1.1)
-        cell_height = int(max_height * 1.1)
+            # Rotate piece contour according to solver's rotation
+            rotated_contour = self._align_piece_to_grid(piece, placed.piece_id, placed.rotation)
 
-        # Create output image
-        img_width = cell_width * solution.grid_cols + 100
-        img_height = cell_height * solution.grid_rows + 150
+            # Get bounding box of rotated contour
+            min_x, min_y = rotated_contour.min(axis=0)
+            max_x, max_y = rotated_contour.max(axis=0)
 
-        # White background
+            piece_data[(placed.grid_row, placed.grid_col)] = {
+                'placed': placed,
+                'contour': rotated_contour,
+                'min_x': min_x, 'min_y': min_y,
+                'max_x': max_x, 'max_y': max_y,
+                'width': max_x - min_x,
+                'height': max_y - min_y
+            }
+
+        # Calculate uniform scale
+        widths = [d['width'] for d in piece_data.values()]
+        heights = [d['height'] for d in piece_data.values()]
+        avg_width = np.mean(widths)
+        avg_height = np.mean(heights)
+
+        target_width = 900
+        scale = target_width / (avg_width * grid_cols * 1.15)
+        scale = min(scale, 0.8)
+
+        margin = 60
+        gap = 20
+        cell_width = avg_width * scale + gap
+        cell_height = avg_height * scale + gap
+
+        img_width = int(margin * 2 + cell_width * grid_cols)
+        img_height = int(margin * 2 + cell_height * grid_rows + 40)
+
         img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255
 
-        # Draw header
-        cv2.putText(img, "SOLVED PUZZLE", (img_width // 2 - 100, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 2, cv2.LINE_AA)
+        # Draw each piece
+        for (row, col), data in piece_data.items():
+            contour = data['contour'].copy() * scale
 
-        confidence_text = f"Confidence: {solution.confidence:.1%}"
-        cv2.putText(img, confidence_text, (img_width // 2 - 80, 70),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 1, cv2.LINE_AA)
+            cell_center_x = margin + col * cell_width + cell_width / 2
+            cell_center_y = margin + row * cell_height + cell_height / 2
 
-        # Starting position for puzzle
-        start_x = 50
-        start_y = 100
+            contour_center_x = (data['min_x'] + data['max_x']) / 2 * scale
+            contour_center_y = (data['min_y'] + data['max_y']) / 2 * scale
 
-        # Draw grid lines
-        for row in range(solution.grid_rows + 1):
-            y = start_y + row * cell_height
-            cv2.line(img, (start_x, y), (start_x + solution.grid_cols * cell_width, y),
-                     (200, 200, 200), 1)
+            offset_x = cell_center_x - contour_center_x
+            offset_y = cell_center_y - contour_center_y
 
-        for col in range(solution.grid_cols + 1):
-            x = start_x + col * cell_width
-            cv2.line(img, (x, start_y), (x, start_y + solution.grid_rows * cell_height),
-                     (200, 200, 200), 1)
+            final_contour = contour + np.array([offset_x, offset_y])
+            final_contour = final_contour.astype(np.int32).reshape(-1, 1, 2)
 
-        # Place each piece
-        for placed in solution.placed_pieces:
-            piece = pieces[placed.piece_id]
+            piece_id = data['placed'].piece_id
+            colors = [
+                (70, 70, 70), (100, 60, 60), (60, 100, 60),
+                (60, 60, 100), (90, 90, 60), (60, 90, 90),
+            ]
+            fill_color = colors[piece_id % len(colors)]
 
-            # Calculate cell center
-            cell_x = start_x + placed.grid_col * cell_width + cell_width // 2
-            cell_y = start_y + placed.grid_row * cell_height + cell_height // 2
+            cv2.drawContours(img, [final_contour], -1, fill_color, -1)
+            cv2.drawContours(img, [final_contour], -1, (40, 40, 40), 2)
 
-            # Draw the piece (rotated)
-            self._draw_rotated_piece(img, piece, (cell_x, cell_y), placed.rotation)
+            label = f"P{piece_id}"
+            cv2.putText(img, label, (int(cell_center_x - 15), int(cell_center_y + 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
 
-            # Draw piece ID
-            label = f"P{placed.piece_id}"
-            label_pos = (cell_x - 15, cell_y + 5)
-            cv2.putText(img, label, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, (255, 255, 255), 3, cv2.LINE_AA)  # White outline
-            cv2.putText(img, label, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, (0, 0, 0), 1, cv2.LINE_AA)
+            rot_label = f"{data['placed'].rotation:.0f}°"
+            cv2.putText(img, rot_label, (int(cell_center_x - 15), int(cell_center_y + 25)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
 
-        # Add legend
-        legend_y = img_height - 30
-        cv2.putText(img, f"Grid: {solution.grid_rows}x{solution.grid_cols}", (20, legend_y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-        cv2.putText(img, f"Pieces placed: {len(solution.placed_pieces)}", (200, legend_y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+        cv2.putText(img, f"Grid: {grid_rows}x{grid_cols}", (10, img_height - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1, cv2.LINE_AA)
+        cv2.putText(img, f"Confidence: {solution.confidence:.1%}", (130, img_height - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1, cv2.LINE_AA)
 
         return img
 
-    def _draw_rotated_piece(self, img: np.ndarray, piece: PuzzlePiece,
-                            center: Tuple[int, int], rotation: float):
+    def _align_piece_to_grid(self, piece: PuzzlePiece, piece_id: int, solver_rotation: float) -> np.ndarray:
         """
-        Draw a piece at a specific position with rotation.
+        Align a piece so its edges are in the correct positions for the grid.
 
-        Args:
-            img: Image to draw on
-            piece: PuzzlePiece to draw
-            center: Center position (x, y)
-            rotation: Rotation in degrees
+        Strategy: Use the detected 'top' edge to find the piece's current orientation,
+        then apply the solver's rotation on top of that.
         """
-        # Get piece contour
-        contour = piece.contour.copy()
+        contour = piece.contour.copy().astype(np.float32).reshape(-1, 2)
+        center = np.array(piece.center, dtype=np.float32)
+        centered = contour - center
 
-        # Translate contour to origin
-        piece_center = np.array(piece.center, dtype=np.float32)
-        contour_float = contour.astype(np.float32).reshape(-1, 2)
-        centered_contour = contour_float - piece_center
+        # Calculate the base rotation needed to make the piece's detected "top" edge
+        # actually point upward (negative Y direction)
+        base_rotation = self._calculate_base_rotation(piece_id, center)
+
+        # Total rotation = base alignment + solver's rotation
+        total_rotation = base_rotation + solver_rotation
 
         # Apply rotation
-        angle_rad = np.radians(rotation)
+        angle_rad = np.radians(total_rotation)
         cos_a = np.cos(angle_rad)
         sin_a = np.sin(angle_rad)
         rotation_matrix = np.array([[cos_a, -sin_a], [sin_a, cos_a]])
 
-        rotated_contour = centered_contour @ rotation_matrix.T
+        rotated = centered @ rotation_matrix.T
 
-        # Scale down to fit in cell
-        scale = 0.6  # Scale to 60% of original size
-        scaled_contour = rotated_contour * scale
+        return rotated
 
-        # Translate to target position
-        final_contour = scaled_contour + np.array(center)
-        final_contour = final_contour.astype(np.int32).reshape(-1, 1, 2)
+    def _calculate_base_rotation(self, piece_id: int, center: np.ndarray) -> float:
+        """
+        Calculate the rotation needed to make the piece's "top" edge point upward.
 
-        # Draw filled contour
-        cv2.drawContours(img, [final_contour], -1, (180, 180, 180), -1)  # Fill
-        cv2.drawContours(img, [final_contour], -1, (50, 50, 50), 2)  # Border
+        Uses the detected edge data to find where the "top" edge currently is,
+        then calculates the rotation to make it point to -Y direction.
+        """
+        if self.edge_detector is None:
+            return 0.0
+
+        edges = self.edge_detector.piece_edges.get(piece_id, {})
+        if 'top' not in edges:
+            return 0.0
+
+        top_edge = edges['top']
+
+        # The "top" edge should go from left to right when the piece is oriented correctly
+        # Calculate the midpoint of the top edge and its direction
+        start = np.array(top_edge.start_point, dtype=np.float32)
+        end = np.array(top_edge.end_point, dtype=np.float32)
+
+        # The midpoint of the top edge
+        mid = (start + end) / 2
+
+        # Vector from center to midpoint of top edge - this should point UP (-Y)
+        vec_to_top = mid - center
+
+        # Calculate angle of this vector
+        # We want it to point UP (angle = -90° or 270°)
+        current_angle = np.degrees(np.arctan2(vec_to_top[1], vec_to_top[0]))
+
+        # The target angle for the top edge is -90° (pointing up)
+        target_angle = -90.0
+
+        # Rotation needed to align
+        rotation = target_angle - current_angle
+
+        # Normalize to [-180, 180]
+        while rotation > 180:
+            rotation -= 360
+        while rotation < -180:
+            rotation += 360
+
+        return rotation
 
     def _create_grid_diagram(self, solution: PuzzleSolution) -> np.ndarray:
-        """
-        Create a simple grid diagram showing piece IDs at each position.
+        """Create a simple grid diagram showing piece IDs."""
+        grid_rows = 2
+        grid_cols = 3
 
-        Args:
-            solution: PuzzleSolution object
+        cell_size = 70
+        margin = 25
 
-        Returns:
-            Grid diagram image
-        """
-        cell_size = 100
-        margin = 50
-
-        img_width = cell_size * solution.grid_cols + 2 * margin
-        img_height = cell_size * solution.grid_rows + 2 * margin + 80
+        img_width = cell_size * grid_cols + 2 * margin
+        img_height = cell_size * grid_rows + 2 * margin + 25
 
         img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255
 
-        # Draw title
-        cv2.putText(img, "PUZZLE LAYOUT", (img_width // 2 - 80, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(img, "LAYOUT", (img_width // 2 - 30, 18),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
-        # Get grid layout
         grid = solution.get_grid_layout()
 
-        # Draw grid
-        for row in range(solution.grid_rows):
-            for col in range(solution.grid_cols):
+        for row in range(grid_rows):
+            for col in range(grid_cols):
                 x = margin + col * cell_size
-                y = 60 + row * cell_size
+                y = 25 + row * cell_size
 
-                # Draw cell border
-                cv2.rectangle(img, (x, y), (x + cell_size, y + cell_size), (0, 0, 0), 2)
+                cv2.rectangle(img, (x, y), (x + cell_size, y + cell_size), (0, 0, 0), 1)
 
-                # Get piece at this position
-                piece_id = grid[row][col]
+                piece_id = grid[row][col] if row < len(grid) and col < len(grid[row]) else None
 
                 if piece_id is not None:
-                    # Find the placed piece for rotation info
                     placed = solution.get_piece_at(row, col)
 
-                    # Draw piece ID
                     text = f"P{piece_id}"
-                    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+                    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
                     text_x = x + (cell_size - text_size[0]) // 2
-                    text_y = y + cell_size // 2
+                    text_y = y + cell_size // 2 + 5
 
                     cv2.putText(img, text, (text_x, text_y),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2, cv2.LINE_AA)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
 
-                    # Draw rotation indicator
                     if placed:
                         rot_text = f"{placed.rotation:.0f}°"
-                        cv2.putText(img, rot_text, (x + 5, y + cell_size - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1, cv2.LINE_AA)
-                else:
-                    # Empty cell
-                    cv2.putText(img, "?", (x + cell_size // 2 - 10, y + cell_size // 2 + 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (200, 200, 200), 2, cv2.LINE_AA)
-
-        # Row/column labels
-        for row in range(solution.grid_rows):
-            y = 60 + row * cell_size + cell_size // 2
-            cv2.putText(img, f"R{row}", (10, y + 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1, cv2.LINE_AA)
-
-        for col in range(solution.grid_cols):
-            x = margin + col * cell_size + cell_size // 2
-            cv2.putText(img, f"C{col}", (x - 10, 55),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1, cv2.LINE_AA)
-
-        return img
-
-    def _create_rotation_guide(self, solution: PuzzleSolution,
-                                pieces: List[PuzzlePiece]) -> np.ndarray:
-        """
-        Create a guide showing each piece with its required rotation.
-
-        Args:
-            solution: PuzzleSolution object
-            pieces: List of PuzzlePiece objects
-
-        Returns:
-            Rotation guide image
-        """
-        num_pieces = len(solution.placed_pieces)
-        if num_pieces == 0:
-            return None
-
-        # Calculate layout
-        cols = min(4, num_pieces)
-        rows = (num_pieces + cols - 1) // cols
-
-        cell_width = 200
-        cell_height = 250
-        margin = 30
-
-        img_width = cell_width * cols + 2 * margin
-        img_height = cell_height * rows + 2 * margin + 60
-
-        img = np.ones((img_height, img_width, 3), dtype=np.uint8) * 255
-
-        # Draw title
-        cv2.putText(img, "PIECE ROTATION GUIDE", (img_width // 2 - 130, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 2, cv2.LINE_AA)
-
-        # Draw each piece
-        for idx, placed in enumerate(solution.placed_pieces):
-            row = idx // cols
-            col = idx % cols
-
-            x = margin + col * cell_width + cell_width // 2
-            y = 80 + row * cell_height + 80  # Leave room for text
-
-            piece = pieces[placed.piece_id]
-
-            # Draw original (left) and rotated (right) view
-            # For now, just draw the rotated contour
-            self._draw_rotated_piece(img, piece, (x, y), placed.rotation)
-
-            # Draw info
-            info_y = 80 + row * cell_height + 20
-            cv2.putText(img, f"Piece {placed.piece_id}", (margin + col * cell_width + 10, info_y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
-
-            cv2.putText(img, f"Pos: ({placed.grid_row}, {placed.grid_col})",
-                        (margin + col * cell_width + 10, info_y + 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1, cv2.LINE_AA)
-
-            cv2.putText(img, f"Rotate: {placed.rotation:.0f}°",
-                        (margin + col * cell_width + 10, info_y + 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 100, 0), 1, cv2.LINE_AA)
-
-            # Draw arrow showing rotation direction
-            arrow_x = x
-            arrow_y = y + 60
-            arrow_len = 30
-
-            # Draw rotation arrow
-            angle_rad = np.radians(placed.rotation)
-            end_x = int(arrow_x + arrow_len * np.cos(angle_rad))
-            end_y = int(arrow_y + arrow_len * np.sin(angle_rad))
-
-            cv2.arrowedLine(img, (arrow_x, arrow_y), (end_x, end_y),
-                            (0, 0, 200), 2, tipLength=0.3)
+                        cv2.putText(img, rot_text, (x + 3, y + cell_size - 4),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.25, (100, 100, 100), 1, cv2.LINE_AA)
 
         return img
