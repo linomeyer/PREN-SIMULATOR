@@ -411,8 +411,7 @@ def match_edges(filename):
                     'classification_match': match.classification_match
                 },
                 'rotation': {
-                    'degrees': match.rotation_offset * 90,
-                    'offset': match.rotation_offset
+                    'degrees': match.rotation_angle,
                 }
             })
 
