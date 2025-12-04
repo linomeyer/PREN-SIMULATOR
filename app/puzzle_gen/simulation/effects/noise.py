@@ -11,20 +11,22 @@ class CombinedNoiseEffect(CameraEffect):
     all noise in a single RNG call and uses the modern Generator API.
     """
 
-    def __init__(self, gaussian_strength: float, color_strength: float):
+    def __init__(self, gaussian_strength: float, color_strength: float, seed: int = None):
         """
         Initialize combined noise effect.
 
         Args:
             gaussian_strength: Strength of Gaussian noise (0-1)
             color_strength: Strength of color noise (0-1)
+            seed: Random seed for reproducibility (optional)
         """
         # Use max strength for skip check
         super().__init__(max(gaussian_strength, color_strength))
         self.gaussian_strength = gaussian_strength
         self.color_strength = color_strength
         # Use modern Generator API (faster than legacy np.random)
-        self.rng = np.random.default_rng()
+        # Pass seed for reproducibility
+        self.rng = np.random.default_rng(seed)
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         """

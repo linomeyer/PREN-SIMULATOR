@@ -70,10 +70,21 @@ def generate():
         layout_str = data.get('layout', '2x3')
         seed = data.get('seed', None)
 
+        # Generate seed early if not provided (for reproducible cut_types)
+        if seed is None:
+            seed = random.randint(0, 999999)
+
         # If no cut_types provided, randomly select 3-5 from all available types
+        # IMPORTANT: If seed is provided, use it to make cut_types reproducible
         if 'cut_types' not in data:
+            # Seed the RNG for cut_types selection (seed is always set now)
+            random.seed(seed)
+
             num_types = random.randint(3, 5)
             cut_types = random.sample(AVAILABLE_CUT_TYPES, num_types)
+
+            # Note: The seed will be set again in PuzzleGenerator.__init__
+            # This ensures cut_types are reproducible with the same seed
         else:
             cut_types = data.get('cut_types')
 
