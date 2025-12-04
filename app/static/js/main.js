@@ -938,7 +938,9 @@ function displayVariants(variants) {
 
             // Wait a bit for scroll, then trigger generation
             setTimeout(() => {
-                document.getElementById('generateBtn').click();
+                const generateBtn = document.getElementById('generateBtn');
+                generateBtn.disabled = false;
+                generateBtn.click();
             }, 500);
         });
 
