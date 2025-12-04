@@ -599,22 +599,6 @@ function displayEdgeResults(data) {
             <div class="label">Interior Pieces</div>
             <div class="detail">${pieceClass.interior_piece_ids.join(', ')}</div>
         </div>
-        <div class="stat-card">
-            <div class="value">${stats.matches_by_rotation['0°']}</div>
-            <div class="label">No Rotation</div>
-        </div>
-        <div class="stat-card">
-            <div class="value">${stats.matches_by_rotation['90°']}</div>
-            <div class="label">90° Rotation</div>
-        </div>
-        <div class="stat-card">
-            <div class="value">${stats.matches_by_rotation['180°']}</div>
-            <div class="label">180° Rotation</div>
-        </div>
-        <div class="stat-card">
-            <div class="value">${stats.matches_by_rotation['270°']}</div>
-            <div class="label">270° Rotation</div>
-        </div>
     `;
 
     // Display match visualizations with larger cards
@@ -649,7 +633,6 @@ function displayEdgeResults(data) {
                     <th style="padding: 10px; border: 1px solid #ddd;">Piece 2</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Edge 2</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Score</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Rotation</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Length Sim</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Shape Sim</th>
                 </tr>

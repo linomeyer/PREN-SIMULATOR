@@ -13,7 +13,6 @@ class EdgeMatch:
     length_similarity: float
     shape_similarity: float
     classification_match: bool
-    rotation_offset: int
     rotation_angle: float
 
     def __repr__(self):
@@ -283,7 +282,6 @@ class EdgeMatcher:
         )
 
         rotation_angle = self._normalize_angle(edge1.angle - edge2.angle + 180.0)
-        rotation_offset = int(round(rotation_angle / 90.0)) % 4
 
         return EdgeMatch(
             edge1=edge1,
@@ -292,7 +290,6 @@ class EdgeMatcher:
             length_similarity=length_similarity,
             shape_similarity=shape_similarity,
             classification_match=classification_match,
-            rotation_offset=rotation_offset,
             rotation_angle=rotation_angle
         )
 
@@ -427,9 +424,6 @@ class EdgeMatcher:
 
         scores = [m.compatibility_score for m in self.matches]
 
-        rotation_counts = {0: 0, 1: 0, 2: 0, 3: 0}
-        for match in self.matches:
-            rotation_counts[match.rotation_offset] += 1
 
         flat_flat = sum(1 for m in self.matches if
                         m.edge1.get_edge_type_classification() == 'flat' and
@@ -451,12 +445,6 @@ class EdgeMatcher:
             'tab_slot_matches': tab_slot,
             'high_confidence_matches': sum(1 for s in scores if s >= 0.8),
             'medium_confidence_matches': sum(1 for s in scores if 0.6 <= s < 0.8),
-            'matches_by_rotation': {
-                '0°': rotation_counts[0],
-                '90°': rotation_counts[1],
-                '180°': rotation_counts[2],
-                '270°': rotation_counts[3]
-            },
             'piece_classification': {
                 'corner_pieces': len(corner_pieces),
                 'border_pieces': len(border_pieces),
