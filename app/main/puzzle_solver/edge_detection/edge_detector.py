@@ -34,7 +34,6 @@ class PieceEdge:
     def _calculate_angle(self) -> float:
         """
         Calculate the angle of the edge baseline in degrees using PCA for robustness.
-        This is more accurate than just using start/end points.
 
         Returns:
             Angle in degrees (0-360), where 0° is pointing right (east)
@@ -42,7 +41,6 @@ class PieceEdge:
         points_2d = self.points.reshape(-1, 2).astype(np.float32)
 
         # Use PCA to find the principal direction of the edge
-        # This is more robust than just using start/end points
         if len(points_2d) >= 2:
             # Calculate mean
             mean = np.mean(points_2d, axis=0)

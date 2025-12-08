@@ -78,7 +78,6 @@ class PieceSegmenter:
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=self.morph_close_iter)
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=self.morph_open_iter)
 
-        # find contours
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # create PuzzlePiece objects
