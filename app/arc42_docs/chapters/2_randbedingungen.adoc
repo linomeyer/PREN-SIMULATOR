@@ -1,0 +1,247 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-architecture-constraints]]
+== Randbedingungen
+
+=== Technische Randbedingungen
+
+==== Hardware-Umgebung
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **Raspberry Pi Camera v3**
+| Ziel-Kamera mit 4608×2592 Pixel Auflösung;
+Fisheye-Objektiv mit signifikanter Barrel Distortion (k1 ≈ -0.28)
+
+| **A5-Format**
+| Gelöstes Puzzle hat Abmessungen 210mm × 148mm (bei 300 DPI: 2480×1748 Pixel);
+muss vollständig im Kamerabild erfasst werden
+
+| **Minimale Rechenleistung**
+| Solver muss auf Raspberry Pi 4 lauffähig sein;
+Performance-Budget: ~5 Sekunden für komplette Pipeline
+|===
+
+==== Software-Stack
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **Python 3.11**
+| Einzige unterstützte Runtime; Kompatibilität mit RasPi OS erforderlich
+
+| **Flask 3.1.2**
+| REST-API für alle Operationen (Generator, Solver, Kalibrierung)
+
+| **OpenCV 4.12**
+| Kernbibliothek für Bildverarbeitung, Konturdetektion, Distortion-Korrektur
+
+| **NumPy 2.2.6**
+| Array-Operationen, geometrische Transformationen
+
+| **Pillow 12.0**
+| High-Level Rendering, Schatten-Effekte, Watermarking
+
+| **SciPy 1.15.3**
+| Optimierungsalgorithmen für Kamera-Kalibrierung
+|===
+
+==== Deployment
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **Virtualenv**
+| Isolierte Python-Umgebung; keine System-weiten Installationen
+
+| **Lokaler Betrieb**
+| Kein Cloud-Dependency; vollständig offline lauffähig für Wettbewerb
+
+| **File-based Storage**
+| Keine Datenbank; Zwischenergebnisse und Visualisierungen in `app/static/output`
+|===
+
+=== Puzzle-spezifische Randbedingungen
+
+==== Puzzle-Geometrie
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **Exakt 6 Teile**
+| Festes 2×3 Layout (2 Zeilen, 3 Spalten);
+keine anderen Konfigurationen
+
+| **Alle Teile haben Randberührung**
+| Jedes Teil grenzt mindestens mit einer Kante an den Puzzle-Rand;
+keine "innenliegenden" Teile ohne Randkante
+
+| **Nur Rotation, kein Umdrehen**
+| Teile müssen nicht gespiegelt werden;
+Rotation im Bereich 0–360° ausreichend
+
+| **Schwarze Teile**
+| Einheitliche Farbe für alle Teile;
+erleichtert Segmentierung durch Kontrast zum weißen Hintergrund
+
+| **Spalt zwischen Teilen**
+| Im gelösten Zustand: ~1mm Abstand zwischen Teilen (bei 300 DPI ≈ 12 Pixel);
+simuliert mechanische Toleranzen des physischen Roboters
+|===
+
+==== Schnittformen
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **Male/Female Pairing**
+| Jede innere Kante hat komplementäre Gegenstücke (Tab ↔ Slot);
+garantierte Passung durch `ReversedCut` Wrapper
+
+| **Gerade Randkanten**
+| Alle äußeren Kanten sind gerade (`StraightCut`);
+vereinfacht Eck-Erkennung und Border-Klassifikation
+
+| **13 verfügbare Cut-Typen**
+| `knob_square`, `knob_triangular`, `knob_wavy`, `knob_round`, `chevron`, etc.;
+Generator wählt zufällig 3–5 Typen pro Puzzle
+
+| **Konsistente Cut-Tiefe**
+| `cut_depth_ratio = 0.2` (20% der Kantenlänge);
+zu flache Cuts erschweren Matching, zu tiefe Cuts führen zu Verwechslungen
+|===
+
+=== Organisatorische Randbedingungen
+
+==== Projektrahmen
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **PREN-Wettbewerb**
+| Zeitrahmen: 14 Wochen Semesterprojekt;
+Abgabe: Dokumentation + funktionierende Demo
+
+| **Vollautomatischer Betrieb**
+| Nach Knopfdruck: Bild aufnehmen → Puzzle lösen → Lösung ausgeben;
+keine manuelle Intervention erlaubt
+
+| **Reproduzierbarkeit**
+| Seed-basierte Generierung für wiederholbare Tests;
+Watermark enthält Seed + Layout für Nachvollziehbarkeit
+|===
+
+==== Team und Skills
+
+[cols="1,3" options="header"]
+|===
+| Randbedingung | Erläuterung
+
+| **Python-Kenntnisse**
+| Team hat Expertise in Python, OpenCV, NumPy;
+keine C/C++ Low-Level Optimierungen
+
+| **Keine ML-Frameworks**
+| Bewusster Verzicht auf TensorFlow/PyTorch;
+klassische Computer-Vision Algorithmen für Transparenz und Debugging
+
+| **arc42-Dokumentation**
+| Gefordert durch Hochschule;
+strukturierte Architektur-Dokumentation als Prüfungsleistung
+|===
+
+=== Konventionen
+
+==== Code-Konventionen
+
+[cols="1,3" options="header"]
+|===
+| Konvention | Erläuterung
+
+| **PEP 8**
+| Python Style Guide für alle Module
+
+| **Type Hints**
+| Typisierung mit `dataclasses` und Annotations wo möglich
+
+| **Docstrings**
+| NumPy-Style Docstrings für alle öffentlichen Funktionen
+
+| **Performance Tracking**
+| `@timed` Decorator für alle kritischen Funktionen (>50ms)
+|===
+
+==== API-Konventionen
+
+[cols="1,3" options="header"]
+|===
+| Konvention | Erläuterung
+
+| **REST-Prinzipien**
+| GET für lesende Operationen, POST für Uploads/Generierung
+
+| **JSON-Responses**
+| Alle API-Antworten im JSON-Format mit `success`/`error` Status
+
+| **Base64-Encoding**
+| Bilder in Responses als Base64-codierte PNG-Strings
+
+| **Query-Parameter**
+| Optionale Parameter über URL-Query (`?min_score=0.5`)
+|===
+
+==== Datei-Konventionen
+
+[cols="1,3" options="header"]
+|===
+| Konvention | Erläuterung
+
+| **Output-Struktur**
+| Alle Visualisierungen in `app/static/output/`;
+Namensschema: `{operation}_{filename}_{index}.png`
+
+| **Cache-Strategie**
+| Segmenter/Cleaner werden pro Session gecacht;
+kein persistenter Speicher zwischen Neustarts
+
+| **Kalibrierungs-Datei**
+| `calibration_params.json` im Projektroot;
+enthält k1, k2, k3, fx, fy, cx, cy Parameter
+|===
+
+=== Qualitätsziele (priorisiert)
+
+[cols="1,2,3" options="header"]
+|===
+| Prio | Qualitätsziel | Messbare Kriterien
+
+| 1
+| **Robustheit**
+| Solver löst >90% der generierten Puzzles korrekt (mit `min_score=0.5`)
+
+| 2
+| **Realitätsnähe**
+| Kamera-Simulation bildet RasPi Camera v3 Artefakte ab (k1 ± 0.05, Noise σ=0.25)
+
+| 3
+| **Performance**
+| Generator: <2s, Solver: <3s auf Entwicklungs-Laptop;
+<5s auf RasPi 4 für komplette Pipeline
+
+| 4
+| **Nachvollziehbarkeit**
+| Alle Zwischenschritte haben Visualisierungen;
+Debug-Info in JSON-Responses
+
+| 5
+| **Wartbarkeit**
+| arc42-Dokumentation + Inline-Docs;
+neue Cut-Typen in <1h integrierbar
+|===

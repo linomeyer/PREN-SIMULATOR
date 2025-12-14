@@ -1,0 +1,279 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-solution-strategy]]
+== Lösungsstrategie
+
+=== Überblick
+
+Die Gesamtlösung besteht aus **zwei unabhängigen, aber komplementären Subsystemen**, die über eine gemeinsame Flask-REST-API kommunizieren:
+
+[cols="1,2,2" options="header"]
+|===
+| Subsystem | Hauptaufgabe | Technologischer Ansatz
+
+| **Puzzle Generator**
+| Erzeugt realistische Test-Puzzles mit Kamera-Simulation
+| Parametrische Geometrie + Physics-based Camera Effects
+
+| **Puzzle Solver**
+| Löst Puzzle-Bilder durch Computer Vision
+| Classical CV Pipeline (Segmentation → Edge Detection → Matching → Solving)
+|===
+
+=== Grundlegende Architekturentscheidungen
+
+==== 1. Strikte Trennung Generator / Solver
+
+**Problem**: Entwicklung und Test der Solver-Algorithmen benötigt reproduzierbare, realitätsnahe Puzzle-Bilder.
+
+**Lösung**:
+- Generator erstellt Ground-Truth Puzzles mit konfigurierbaren Parametern (Seed, Cut-Types, Kamera-Effekte)
+- Solver arbeitet ausschließlich mit Bildern (keine Geometrie-Informationen)
+- Communication-Only Interface über REST-API
+
+**Begründung**:
+- Ermöglicht unabhängige Entwicklung beider Komponenten
+- Generator liefert "Solution Image" als Ground Truth für Solver-Evaluation
+- Realistische Testbedingungen: Solver sieht nur Pixel, keine Metadaten
+
+==== 2. Klassische Computer Vision statt Machine Learning
+
+**Problem**: Puzzle-Solving könnte mit CNNs (Deep Learning) gelöst werden, aber...
+
+**Lösung**: Bewusster Einsatz klassischer CV-Algorithmen:
+- Otsu Thresholding für Segmentierung
+- PCA-basierte Kantenerkennung
+- Korrelations-basiertes Edge-Matching
+- Graph-basiertes Solving
+
+**Begründung**:
+- **Interpretierbarkeit**: Jeder Schritt ist nachvollziehbar und debuggbar
+- **Keine Training-Daten**: Keine großen Puzzle-Datensätze verfügbar
+- **Performance**: Läuft auf Raspberry Pi 4 (< 5s)
+- **Präzision**: Deterministisch bei guten Matches (> 90% Erfolgsrate)
+
+==== 3. Pipeline-Architektur mit Zwischenspeicherung
+
+**Problem**: Iterative Parameteranpassung wäre langsam, wenn Pipeline immer von vorne startet.
+
+**Lösung**: Stufenartige Pipeline mit Cache:
+
+**Begründung**:
+- **Schnelles Tuning**: `min_score` ändern ohne Re-Segmentierung
+- **Visualisierung**: Jeder Schritt erzeugt Debug-Outputs
+- **Fehlerdiagnose**: Problem lokalisierbar in spezifischer Pipeline-Stufe
+
+==== 4. Parametrische Cut-Generierung
+
+**Problem**: Puzzle-Schnittformen müssen vielfältig und perfekt passend sein.
+
+**Lösung**: Abstract Base Class `Cut` mit 13 Implementierungen:
+
+- **Male/Female Pairing**: `ReversedCut` Wrapper garantiert Komplementarität
+- **Parametrisch**: Cuts als Funktionen `f(t, start, end, is_male, depth_ratio) → points`
+- **Reproduzierbar**: Seed-basierte Randomisierung
+
+**Begründung**:
+- **Garantierte Passung**: Mathematisch exakte Umkehrung durch Punktinvertierung
+- **Erweiterbar**: Neue Cut-Typen in <1h integrierbar
+- **Realitätsnah**: 13 Varianten decken Standard-Jigsaw-Formen ab
+
+=== Strategien pro Subsystem
+
+==== Puzzle Generator: Realistische Simulation
+
+===== Kern-Strategie: Physics-based Rendering Pipeline
+
+**Wichtigste Entscheidungen**:
+
+[cols="1,2,2" options="header"]
+|===
+| Aspekt | Lösung | Rationale
+
+| **Cut-Pairing**
+| `ReversedCut` wrapper invertiert Punktreihenfolge + male/female
+| Garantiert perfekte Passung ohne manuelles Tuning
+
+| **Piece Placement**
+| Grid-basiert mit Safe Zones (40% radius)
+| Verhindert Überlappung trotz 0-360° Rotation
+
+| **Shadow Rendering**
+| Bbox-basiert bei 0.5× scale + LANCZOS upscaling
+| 4× Speedup vs. Full-Canvas bei minimaler Quality-Loss
+
+| **Camera Effects**
+| Realistische Reihenfolge: Lens → Sensor → Processing
+| Simuliert tatsächliche Kamera-Pipeline (nicht nur Noise)
+
+| **Calibration**
+| Grid-based Hough + SciPy Optimization
+| Misst echte RasPi Camera v3 Distortion (k1, k2, k3)
+|===
+
+===== Performance-Optimierungen
+
+- **Shadow Scale**: 0.5× → ~400ms für 6 Teile (statt ~1600ms)
+- **Combined Noise**: Gaussian + Color in einem RNG-Call → 30% faster
+- **@timed Decorator**: Automatisches Performance-Tracking aller Bottlenecks
+
+==== Puzzle Solver: Robuste CV-Pipeline
+
+===== Kern-Strategie: Hierarchische Feature-Extraktion
+
+**Wichtigste Entscheidungen**:
+
+[cols="1,2,2" options="header"]
+|===
+| Pipeline-Stufe | Algorithmus-Wahl | Rationale
+
+| **Global Cleaning**
+| OpenCV `undistort()` mit calibration_params.json
+| Kompensiert RasPi Camera Barrel Distortion (k1 ≈ -0.28)
+
+| **Segmentation**
+| Otsu + Morphological Closing/Opening
+| Robust bei schwarzen Teilen auf weißem Grund
+
+| **Corner Detection**
+| minAreaRect + Snap to Contour
+| Stabile Orientierung trotz Tabs/Slots
+
+| **Edge Classification**
+| Perpendicular Distance + Signed Area
+| Kombiniert global/lokal → robust trotz Noise
+
+| **Edge Matching**
+| Curvature Correlation + Length + Class Compatibility
+| Leichtgewichtig, erklärbar, kein Training nötig
+
+| **Solving**
+| Corner-Start + Greedy Neighbor Expansion
+| Nutzt Border-Constraints (alle Teile haben ≥1 flat edge)
+|===
+
+===== Robustheit-Strategien
+
+[cols="1,3" options="header"]
+|===
+| Problem | Lösung
+
+| **Ungleichmäßige Beleuchtung**
+| Vignette-Correction in GlobalCleaner
+
+| **Gekrümmte Edges durch Distortion**
+| Barrel-Distortion Calibration vor Segmentierung
+
+| **Ambige Matches**
+| Unique Best Match Rule: pro Edge nur 1 Partner > min_score
+
+| **Missing Corners**
+| Fallback: Try all 4 corners as start position
+
+| **Weak Matches**
+| Tunable `min_score` Parameter (default 0.5, range 0.0-1.0)
+|===
+
+=== Qualitätssicherung
+
+==== Visualisierung auf jeder Stufe
+
+**Strategie**: Jede Pipeline-Stufe erzeugt Debug-Outputs in `app/static/output/`
+
+[cols="1,2,2" options="header"]
+|===
+| Stufe | Visualisierung | Nutzen
+
+| Segmentation
+| RGBA pieces mit transparentem Background
+| Kontur-Qualität, Overlap-Check
+
+| Edge Detection
+| Konturen + Ecken + Kanten mit Labels
+| Corner-Order, Edge-Cut Validierung
+
+| Matching
+| Side-by-Side Edge-Pairs mit Scores
+| False-Positive Identifikation
+
+| Solution
+| Grid-Layout + Rendered Assembly
+| End-to-End Plausibilität
+|===
+
+==== Performance-Metriken
+
+**Strategie**: `@timed` Decorator auf allen kritischen Funktionen
+
+- Automatisches Logging bei `enable_performance_logging=true`
+- Ziel-Budget: Generator <2s, Solver <3s auf Entwicklungs-Laptop
+- Akzeptabel: <5s auf RasPi 4
+
+=== Entscheidungsmatrix: Zentrale Trade-offs
+
+[cols="2,2,2,2" options="header"]
+|===
+| Aspekt | Option A | Option B | Gewählte Lösung
+
+| **CV-Ansatz**
+| Deep Learning (CNN)
+| Classical CV
+| **Classical CV**: Interpretierbar, kein Training, RasPi-kompatibel
+
+| **Cut-Speicherung**
+| Pixel-basiert (Template)
+| Parametrisch (Functions)
+| **Parametrisch**: Perfekte Passung, skalierbar, seed-reproducible
+
+| **Matching-Strategie**
+| Global Optimization
+| Greedy Best-Match
+| **Greedy**: Schnell, lokal optimierbar via min_score
+
+| **Calibration**
+| Manual Tuning
+| Automated Grid-based
+| **Automated**: Reproduzierbar, scientific (k1/k2/k3 measurement)
+
+| **Shadow-Rendering**
+| Full-Canvas Blur
+| Bbox-scaled Rendering
+| **Bbox-scaled**: 4× faster, ausreichende Qualität
+
+| **Piece Placement**
+| Random + Collision Check
+| Grid-based Safe Zones
+| **Grid-based**: Garantiert kein Overlap, deterministisch
+|===
+
+=== Zusammenfassung: Warum diese Architektur?
+
+[cols="1,3" options="header"]
+|===
+| Designprinzip | Umsetzung
+
+| **Separation of Concerns**
+| Generator und Solver sind unabhängige Microservices über REST
+
+| **Testbarkeit**
+| Generator liefert Ground Truth, Solver hat keinerlei Geometrie-Wissen
+
+| **Nachvollziehbarkeit**
+| Classical CV statt Black-Box ML; jede Stufe visualisiert
+
+| **Performance**
+| Shadow-Scale, Combined-Noise, Bbox-Rendering → <2s Generator
+
+| **Robustheit**
+| Multi-Score Matching, Calibration, Border-Constraints → >90% Solver-Erfolg
+
+| **Erweiterbarkeit**
+| Abstract Cut-Base-Class, Pipeline-Cache, Tunable Parameters
+|===
+
+=== Referenzen zu Detailkapiteln
+
+- **Bausteinsicht (Kapitel 5)**: Detaillierte Modul-Struktur
+- **Laufzeitsicht (Kapitel 6)**: Konkrete Ablaufszenarien
+- **Architekturentscheidungen (Kapitel 9)**: Einzelne ADRs mit Alternativen
+- **Qualitätsanforderungen (Kapitel 10)**: Messbare Qualitätskriterien

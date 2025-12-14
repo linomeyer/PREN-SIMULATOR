@@ -1,0 +1,253 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-runtime-view]]
+== Laufzeitsicht
+
+=== Überblick
+
+Dieses Kapitel beschreibt die wichtigsten Ablaufszenarien des Systems zur Laufzeit. Es zeigt, wie die in Kapitel 5 beschriebenen Bausteine zusammenarbeiten, um die Hauptfunktionalitäten zu realisieren.
+
+**Abgedeckte Szenarien:**
+
+1. Puzzle-Generierung (Generator)
+2. Puzzle-Lösung (Solver)
+3. Kamera-Kalibrierung (Generator)
+
+=== Szenario 1: Puzzle-Generierung
+
+==== Motivation
+
+Ein Entwickler möchte ein neues Test-Puzzle mit realistischen Kamera-Effekten generieren, um den Solver zu testen.
+
+==== Ablauf
+
+[source]
+----
+User                Flask           api.py          geometry/       rendering/      simulation/
+ │                   │               │               puzzle.py       renderer.py     camera.py
+ │                   │               │               │               │               │
+ │ POST /generate    │               │               │               │               │
+ ├──────────────────>│               │               │               │               │
+ │ {seed: 42,        │               │               │               │               │
+ │  cut_types: [...],│               │               │               │               │
+ │  layout: "2x3"}   │               │               │               │               │
+ │                   │               │               │               │               │
+ │                   │ parse params  │               │               │               │
+ │                   ├──────────────>│               │               │               │
+ │                   │               │               │               │               │
+ │                   │               │ generate()    │               │               │
+ │                   │               ├──────────────>│               │               │
+ │                   │               │               │               │               │
+ │                   │               │               │ _assign_edge_cuts()           │
+ │                   │               │               │ (Male/Female Pairing)        │
+ │                   │               │               ├──────────┐    │               │
+ │                   │               │               │          │    │               │
+ │                   │               │               │<─────────┘    │               │
+ │                   │               │               │               │               │
+ │                   │               │               │ _create_piece() (6x)          │
+ │                   │               │               ├──────────┐    │               │
+ │                   │               │               │          │    │               │
+ │                   │               │               │<─────────┘    │               │
+ │                   │               │               │               │               │
+ │                   │               │               │ _randomize_placement()        │
+ │                   │               │               │ (Grid + Rotation)            │
+ │                   │               │               ├──────────┐    │               │
+ │                   │               │               │          │    │               │
+ │                   │               │               │<─────────┘    │               │
+ │                   │               │               │               │               │
+ │                   │               │ pieces        │               │               │
+ │                   │               │<──────────────┤               │               │
+ │                   │               │               │               │               │
+ │                   │               │ render_clean()│               │               │
+ │                   │               ├───────────────┼──────────────>│               │
+ │                   │               │               │               │               │
+ │                   │               │               │               │ _render_shadow()
+ │                   │               │               │               │ (Bbox @ 0.5x)
+ │                   │               │               │               ├──────────┐
+ │                   │               │               │               │          │
+ │                   │               │               │               │<─────────┘
+ │                   │               │               │               │
+ │                   │               │               │               │ _render_pieces()
+ │                   │               │               │               ├──────────┐
+ │                   │               │               │               │          │
+ │                   │               │               │               │<─────────┘
+ │                   │               │               │               │
+ │                   │               │ clean_image   │               │
+ │                   │               │<──────────────┼───────────────┤
+ │                   │               │               │               │
+ │                   │               │ render_solution()             │
+ │                   │               ├───────────────┼──────────────>│
+ │                   │               │               │               │
+ │                   │               │ solution_img  │               │
+ │                   │               │<──────────────┼───────────────┤
+ │                   │               │               │               │
+ │                   │               │ apply_camera_sim()            │
+ │                   │               ├───────────────┼───────────────┼──────────────>│
+ │                   │               │               │               │               │
+ │                   │               │               │               │ barrel_distortion()
+ │                   │               │               │               │ perspective()
+ │                   │               │               │               │ chromatic_aberration()
+ │                   │               │               │               │ vignette()
+ │                   │               │               │               │ noise + denoise
+ │                   │               │               │               │               │
+ │                   │               │ noisy_image   │               │               │
+ │                   │               │<──────────────┼───────────────┼───────────────┤
+ │                   │               │               │               │               │
+ │                   │ result        │               │               │               │
+ │                   │<──────────────┤               │               │               │
+ │                   │               │               │               │               │
+ │ JSON response     │               │               │               │               │
+ │<──────────────────┤               │               │               │               │
+ │ {noisy_image,     │               │               │               │               │
+ │  solution_image,  │               │               │               │               │
+ │  metadata}        │               │               │               │               │
+----
+
+==== Wichtige Schritte
+
+* 1. Edge Cut Assignment
+
+* 2. Piece Creation
+
+* 3. Randomize Placement
+
+* 4. Clean Rendering
+
+* 5. Solution Rendering
+
+* 6. Camera Simulation
+
+
+=== Szenario 2: Puzzle-Lösung
+
+==== Motivation
+
+Ein Entwickler lädt ein vom Generator erzeugtes Puzzle-Bild hoch und möchte die automatische Lösung testen.
+
+==== Ablauf
+
+[source]
+----
+User          Flask        preprocessing/  piece_extraction/  edge_detection/  edge_matching/  solver/
+ │            routes.py    global_cleaner  extractor.py       edge_detector    edge_matcher    solver.py
+ │             │           │               │                  │                │               │
+ │ POST /upload│           │               │                  │                │               │
+ ├────────────>│           │               │                  │                │               │
+ │             │ save img  │               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │ GET /extract│           │               │                  │                │               │
+ ├────────────>│           │               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ (check cache)             │                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ clean()   │               │                  │                │               │
+ │             ├──────────>│               │                  │                │               │
+ │             │           │ undistort()   │                  │                │               │
+ │             │           │ (k1,k2,k3)    │                  │                │               │
+ │             │           ├──────┐        │                  │                │               │
+ │             │           │      │        │                  │                │               │
+ │             │           │<─────┘        │                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ cleaned   │               │                  │                │               │
+ │             │<──────────┤               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ segment_pieces()          │                  │                │               │
+ │             ├───────────┼──────────────>│                  │                │               │
+ │             │           │               │ Grayscale        │                │               │
+ │             │           │               │ Blur (kernel=7)  │                │               │
+ │             │           │               │ Otsu Threshold   │                │               │
+ │             │           │               │ Morphology       │                │               │
+ │             │           │               │ findContours()   │                │               │
+ │             │           │               ├──────────┐       │                │               │
+ │             │           │               │          │       │                │               │
+ │             │           │               │<─────────┘       │                │               │
+ │             │           │               │                  │                │               │
+ │             │ pieces    │               │                  │                │               │
+ │             │<──────────┼───────────────┤                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ (cache segmenter)         │                  │                │               │
+ │             │           │               │                  │                │               │
+ │ JSON resp.  │           │               │                  │                │               │
+ │<────────────┤           │               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │ GET /detect-edges      │               │                  │                │               │
+ ├────────────>│           │               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ detect_edges()            │                  │                │               │
+ │             ├───────────┼───────────────┼─────────────────>│                │               │
+ │             │           │               │                  │ minAreaRect()  │               │
+ │             │           │               │                  │ snap corners   │               │
+ │             │           │               │                  │ extract edges  │               │
+ │             │           │               │                  │ PCA angle      │               │
+ │             │           │               │                  │ curvature sig. │               │
+ │             │           │               │                  │ classify       │               │
+ │             │           │               │                  │ (flat/tab/slot)│               │
+ │             │           │               │                  ├──────────┐     │               │
+ │             │           │               │                  │          │     │               │
+ │             │           │               │                  │<─────────┘     │               │
+ │             │           │               │                  │                │               │
+ │             │ edges     │               │                  │                │               │
+ │             │<──────────┼───────────────┼──────────────────┤                │               │
+ │             │           │               │                  │                │               │
+ │ JSON resp.  │           │               │                  │                │               │
+ │<────────────┤           │               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │ GET /solve-puzzle      │               │                  │                │               │
+ ├────────────>│           │               │                  │                │               │
+ │             │           │               │                  │                │               │
+ │             │ (re-run edge detection + matching internally)                 │               │
+ │             │           │               │                  │                │               │
+ │             │ find_matches()            │                  │                │               │
+ │             ├───────────┼───────────────┼──────────────────┼───────────────>│               │
+ │             │           │               │                  │                │ correlation   │
+ │             │           │               │                  │                │ length_sim    │
+ │             │           │               │                  │                │ class_compat  │
+ │             │           │               │                  │                │ unique_best   │
+ │             │           │               │                  │                ├──────────┐    │
+ │             │           │               │                  │                │          │    │
+ │             │           │               │                  │                │<─────────┘    │
+ │             │           │               │                  │                │               │
+ │             │ matches   │               │                  │                │               │
+ │             │<──────────┼───────────────┼──────────────────┼────────────────┤               │
+ │             │           │               │                  │                │               │
+ │             │ solve()   │               │                  │                │               │
+ │             ├───────────┼───────────────┼──────────────────┼────────────────┼──────────────>│
+ │             │           │               │                  │                │               │
+ │             │           │               │                  │                │ identify_corners()
+ │             │           │               │                  │                │ (2 flat edges)
+ │             │           │               │                  │                │               │
+ │             │           │               │                  │                │ try_each_corner()
+ │             │           │               │                  │                │ as top-left
+ │             │           │               │                  │                │               │
+ │             │           │               │                  │                │ greedy_expand()
+ │             │           │               │                  │                │ via matches
+ │             │           │               │                  │                │               │
+ │             │           │               │                  │                │ calculate_rotations()
+ │             │           │               │                  │                ├──────────┐
+ │             │           │               │                  │                │          │
+ │             │           │               │                  │                │<─────────┘
+ │             │           │               │                  │                │
+ │             │ solution  │               │                  │                │
+ │             │<──────────┼───────────────┼──────────────────┼────────────────┼───────────────┤
+ │             │           │               │                  │                │               │
+ │ JSON resp.  │           │               │                  │                │               │
+ │<────────────┤           │               │                  │                │               │
+ │ {grid_layout,│          │               │                  │                │               │
+ │  placed_pieces,│        │               │                  │                │               │
+ │  confidence}│           │               │                  │                │               │
+----
+
+==== Wichtige Schritte
+
+* 1. Global Cleaning
+* 2. Segmentation
+* 3. Edge Detection
+* 4. Edge Matching
+* 5. Solving
+
+==== Besonderheiten
+
+* **Caching**: Segmenter wird gecacht → min_score Änderung ohne Re-Segmentierung
+* **Corner-Start**: Nutzt Constraint "alle Teile haben ≥1 flat edge"
+* **Greedy Expansion**: Schnell, aber lokal optimal (keine Backtracking)
+

@@ -1,0 +1,124 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-concepts]]
+== Querschnittliche Konzepte
+
+=== Überblick
+
+Dieses Kapitel beschreibt übergreifende Konzepte und Lösungsansätze, die in mehreren Bausteinen verwendet werden.
+
+=== Konfigurationsverwaltung
+
+==== Konzept
+
+Alle Parameter werden über **typsichere Python Dataclasses** verwaltet, keine Plain Dicts oder Magic Strings.
+
+==== Implementierung
+
+[cols="1,2,2" options="header"]
+|===
+| Komponente | Dataclasses | Zweck
+
+| **Generator**
+| `GeneratorConfig`, `PuzzleConfig`, `RenderConfig`, `CameraConfig`, `OutputConfig`
+| Typsichere Parameter für Geometrie, Rendering, Kamera-Effekte
+
+| **Solver**
+| Parameter als Query-Strings (`min_score`, `blur_kernel`)
+| Keine komplexen Configs nötig (Pipeline-basiert)
+|===
+
+==== Vorteile
+
+* **IDE-Support**: Autocomplete, Type Checking
+* **Validation**: Fehler zur Compile-Zeit statt Runtime
+* **Dokumentation**: Types sind Self-Documenting
+
+=== Fehlerbehandlung
+
+==== Strategie
+
+Einheitliche JSON-Error-Responses auf allen REST-Endpunkten.
+
+==== Standard-Format
+
+[source,json]
+----
+{
+  "success": false,
+  "error": "Human-readable error message",
+  "details": {
+    "code": "ERROR_CODE",
+    "context": {...}
+  }
+}
+----
+
+==== Fehlertypen
+
+[cols="1,2,1" options="header"]
+|===
+| Typ | Beispiel | HTTP Code
+
+| **Validation Error**
+| "Invalid parameter: blur_kernel must be odd"
+| 400
+
+| **Not Found**
+| "File not found: puzzle.jpg"
+| 404
+
+| **Processing Error**
+| "Could not solve puzzle - insufficient matches"
+| 400
+
+| **Internal Error**
+| "Unexpected error in edge detection"
+| 500
+|===
+
+=== Logging und Debugging
+
+==== Visualisierungs-Pipeline
+
+**Strategie**: Jede Pipeline-Stufe erzeugt Debug-PNG in `app/static/output/`
+
+[cols="1,2" options="header"]
+|===
+| Stufe | Output-Dateien
+
+| **Segmentation**
+| `pieces_<filename>_<id>.png` (RGBA mit transparentem Background)
+
+| **Edge Detection**
+| `edges_<filename>_<id>.png` (Konturen + Ecken + Labels)
+
+| **Matching**
+| `matches_<filename>_<id>.png` (Side-by-Side Edge-Pairs mit Scores)
+
+| **Solution**
+| `solution_grid_<filename>.png`, `solution_render_<filename>.png`
+|===
+
+==== Abruf
+
+Via REST-API: `GET /output/<filename>.png`
+
+
+=== Reproduzierbarkeit
+
+==== Seed-basierte Generierung
+
+**Generator** nutzt Seeds für deterministisches Verhalten:
+
+[source,python]
+----
+if seed is not None:
+    np.random.seed(seed)
+----
+
+**Vorteile**:
+
+* Exakte Reproduzierbarkeit von Test-Puzzles
+* Bug-Reports mit Seed → 100% nachvollziehbar
+* A/B Testing verschiedener Algorithmen
