@@ -1,6 +1,6 @@
 include::chapters/config.adoc[]
 
-= Verteiltes Logging System
+= PREN - Puzzle Simulator
 :revnumber: 8.2 EN
 :revdate: January 2023
 :revremark: (based upon AsciiDoc version)
