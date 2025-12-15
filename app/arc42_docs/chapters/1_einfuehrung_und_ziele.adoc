@@ -5,18 +5,16 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Aufgabenstellung
 
-Das Projekt "Puzzle-Roboter-Simulator" entsteht im Rahmen eines Wettbewerbs, bei dem ein physischer Puzzle-Roboter per Knopfdruck ein 2×3-Puzzle lösen muss. Der **Simulator** dient der Entwicklung und dem Test der Software-Komponenten in einer kontrollierten, realitätsnahen Umgebung, bevor diese auf die physische Hardware übertragen werden.
+Das Projekt "Puzzle-Roboter-Simulator" entsteht im Rahmen eines Wettbewerbs, bei dem ein physischer Puzzle-Roboter per Knopfdruck ein Puzzle mit 6 Puzzle-Teilen lösen muss. Der **Simulator** dient der Entwicklung und dem Test der Software-Komponenten in einer kontrollierten, realitätsnahen Umgebung, bevor diese auf die physische Hardware übertragen werden.
 
 Der Simulator umfasst zwei Hauptkomponenten:
 
-1. **Puzzle Generator**: Erzeugt realistische Puzzle-Bilder mit konfigurierbaren Kamera-Effekten (Barrel Distortion, Vignettierung, Rauschen, etc.), um die Aufnahmebedingungen einer günstigen Smartphone-Kamera zu simulieren.
+1. **Puzzle Generator**: Erzeugt realistische Puzzle-Bilder mit konfigurierbaren Kamera-Effekten (Barrel Distortion, Vignettierung, Rauschen, etc.), um die Aufnahmebedingungen einer RaspberryPi Kamera zu simulieren.
 
 2. **Puzzle Solver**: Analysiert die generierten Bilder und löst das Puzzle durch Bilderkennung, Kantenerkennung, Edge-Matching und Layout-Rekonstruktion.
 
-[NOTE]
-Der Fokus dieser Dokumentation liegt auf dem **Software-Simulator** – nicht auf dem physischen Roboter.
 
-=== Qualitätsziele
+=== Qualitätsziele move
 
 [cols="1,2,2" options="header"]
 |===
@@ -32,7 +30,7 @@ Der Fokus dieser Dokumentation liegt auf dem **Software-Simulator** – nicht au
 
 | 3
 | **Nachvollziehbarkeit**
-| Alle Pipeline-Schritte (von der Vorverarbeitung bis zur Lösung) müssen visualisiert und nachvollziehbar sein, um Fehleranalyse und Debugging zu ermöglichen.
+| Alle Pipeline-Schritte (von der Vorverarbeitung bis zur Lösung) müssen visualisiert und nachvollziehbar sein, um Fehleranalyse und Debugging möglichst einfach zu gestalten.
 
 | 4
 | **Konfigurierbarkeit**
@@ -40,71 +38,5 @@ Der Fokus dieser Dokumentation liegt auf dem **Software-Simulator** – nicht au
 
 | 5
 | **Performance**
-| Die komplette Pipeline (Generierung + Solving) sollte in <5 Sekunden ablaufen, um iterative Tests zu ermöglichen.
-|===
-
-=== Stakeholder
-
-[cols="1,2,2" options="header"]
-|===
-| Rolle | Kontakt | Erwartungshaltung
-
-| **Entwicklungsteam**
-| Projektteam PREN
-| Zuverlässiges Testwerkzeug zur Entwicklung und Validierung der Bildverarbeitungsalgorithmen; einfache Integration in Entwicklungs-Workflow.
-
-| **Wettbewerbs-Jury**
-| PREN-Veranstalter
-| Demonstration der technischen Machbarkeit und Robustheit des Ansatzes anhand der Simulator-Ergebnisse.
-
-| **Hardware-Team**
-| Roboter-Entwicklung
-| Präzise Anforderungen an Kamera-Hardware (Auflösung, Verzerrung) und Kalibrierungsparameter basierend auf Simulator-Erkenntnissen.
-
-| **Betreuer/Dozenten**
-| HSLU Dozenten
-| Nachvollziehbare Dokumentation der Architektur und Algorithmen; fundierte Begründung von Design-Entscheidungen.
-|===
-
-=== Randbedingungen
-
-==== Technische Randbedingungen
-
-[cols="1,3" options="header"]
-|===
-| Randbedingung | Beschreibung
-
-| **Python 3.11**
-| Programmiersprache für alle Komponenten
-
-| **Flask REST API**
-| Kommunikation zwischen Generator, Solver und (zukünftig) physischer Hardware
-
-| **OpenCV + NumPy + Pillow**
-| Kernbibliotheken für Bildverarbeitung
-
-| **Raspberry Pi Camera v3**
-| Ziel-Hardware: 4608×2592 Pixel, Fisheye-Verzerrung
-
-| **Virtualenv**
-| Isolierte Python-Umgebung für Abhängigkeiten
-|===
-
-==== Organisatorische Randbedingungen
-
-[cols="1,3" options="header"]
-|===
-| Randbedingung | Beschreibung
-
-| **Zeitrahmen**
-| Entwicklung im Rahmen eines Semesterprojekts (ca. 14 Wochen)
-
-| **Wettbewerbsformat**
-| 2×3 Puzzle (6 Teile) mit standardisierten Abmessungen (A5-Format @ 300 DPI)
-
-| **Knopfdruck-Start**
-| Physischer Roboter muss vollautomatisch arbeiten – Simulator simuliert diesen Prozess Ende-zu-Ende
-
-| **Dokumentationspflicht**
-| arc42-Dokumentation als Teil der Projektabgabe
+| Die komplette Pipeline (Generierung + Solving) sollte in <30 Sekunden ablaufen, um iterative Tests zu ermöglichen.
 |===

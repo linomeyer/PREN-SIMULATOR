@@ -1,0 +1,54 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-architecture-decisions]]
+== Architekturentscheidungen
+
+=== 1. Strikte Trennung Generator / Solver
+
+**Problem**: Entwicklung und Test der Solver-Algorithmen benötigt reproduzierbare, realitätsnahe Puzzle-Bilder.
+
+**Lösung**:
+- Generator erstellt Puzzles mit konfigurierbaren Parametern (Seed, Cut-Types, Kamera-Effekte)
+- Solver arbeitet ausschließlich mit Bildern
+- Communication-Only Interface über REST-API
+
+
+=== 2. Klassische Computer Vision statt Machine Learning
+
+**Problem**: Puzzle-Solving könnte mit Machine Learning Ansätzen wie z.B. Deep Learning gelöst werden
+
+**Lösung**:
+
+Bewusster Einsatz klassischer CV-Algorithmen
+
+**Begründung**:
+
+- **Interpretierbarkeit**: Jeder Schritt ist nachvollziehbar und debuggbar
+
+- **Keine Training-Daten**: Keine großen Puzzle-Datensätze verfügbar
+
+- **Erfahrung**: Wenig Grundwissen und Erfahrung in diesem Bereich
+
+=== 3. Pipeline-Architektur mit Zwischenspeicherung
+
+**Problem**: Der Puzzle-Simulator könnte das Puzzle per Knopfdruck in "einem Schritt" lösen, aber dadurch wäre die manuelle testbarkeit der einzelnen Schritte sehr eingeschränkt.
+
+**Lösung**:
+
+Lösung des Puzzles als Pipeline in einzelnen Teilschritten.
+
+**Begründung**:
+
+- **Visualisierung**: Jeder Schritt erzeugt visualisierte Outputs
+
+- **Fehlerdiagnose**: Problem lokalisierbar in spezifischem Pipeline-Schritt
+
+=== 4. Generierte Puzzles müssen vielseitig und reproduzierbar sein
+
+**Problem**: Puzzle-Schnittformen müssen vielfältig und perfekt passend sein.
+
+**Lösung**: Abstract Base Class `Cut` mit 13 Implementierungen und einer seed basierten Random-Generierung
+
+- **Male/Female Pairing**: `ReversedCut` Wrapper macht es einfach Gegenstücke zu generieren
+
+- **Reproduzierbar**: Seed-basierte Randomisierung

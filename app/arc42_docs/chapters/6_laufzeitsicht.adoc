@@ -11,7 +11,6 @@ Dieses Kapitel beschreibt die wichtigsten Ablaufszenarien des Systems zur Laufze
 
 1. Puzzle-Generierung (Generator)
 2. Puzzle-Lösung (Solver)
-3. Kamera-Kalibrierung (Generator)
 
 === Szenario 1: Puzzle-Generierung
 
@@ -39,7 +38,7 @@ User                Flask           api.py          geometry/       rendering/  
  │                   │               ├──────────────>│               │               │
  │                   │               │               │               │               │
  │                   │               │               │ _assign_edge_cuts()           │
- │                   │               │               │ (Male/Female Pairing)        │
+ │                   │               │               │ (Male/Female Pairing)         │
  │                   │               │               ├──────────┐    │               │
  │                   │               │               │          │    │               │
  │                   │               │               │<─────────┘    │               │
@@ -50,7 +49,7 @@ User                Flask           api.py          geometry/       rendering/  
  │                   │               │               │<─────────┘    │               │
  │                   │               │               │               │               │
  │                   │               │               │ _randomize_placement()        │
- │                   │               │               │ (Grid + Rotation)            │
+ │                   │               │               │ (Grid + Rotation)             │
  │                   │               │               ├──────────┐    │               │
  │                   │               │               │          │    │               │
  │                   │               │               │<─────────┘    │               │
@@ -62,7 +61,6 @@ User                Flask           api.py          geometry/       rendering/  
  │                   │               ├───────────────┼──────────────>│               │
  │                   │               │               │               │               │
  │                   │               │               │               │ _render_shadow()
- │                   │               │               │               │ (Bbox @ 0.5x)
  │                   │               │               │               ├──────────┐
  │                   │               │               │               │          │
  │                   │               │               │               │<─────────┘
@@ -84,11 +82,9 @@ User                Flask           api.py          geometry/       rendering/  
  │                   │               │ apply_camera_sim()            │
  │                   │               ├───────────────┼───────────────┼──────────────>│
  │                   │               │               │               │               │
- │                   │               │               │               │ barrel_distortion()
- │                   │               │               │               │ perspective()
- │                   │               │               │               │ chromatic_aberration()
- │                   │               │               │               │ vignette()
- │                   │               │               │               │ noise + denoise
+ │                   │               │               │               │        barrel_distortion()
+ │                   │               │               │               │        perspective()
+ │                   │               │               │               │        chromatic_aberration()
  │                   │               │               │               │               │
  │                   │               │ noisy_image   │               │               │
  │                   │               │<──────────────┼───────────────┼───────────────┤
@@ -105,17 +101,17 @@ User                Flask           api.py          geometry/       rendering/  
 
 ==== Wichtige Schritte
 
-* 1. Edge Cut Assignment
+* 1. Edge Cuts zuteilen
 
-* 2. Piece Creation
+* 2. Teile generieren
 
-* 3. Randomize Placement
+* 3. Zufälliges platzieren
 
-* 4. Clean Rendering
+* 4. Sauberes Rendering
 
-* 5. Solution Rendering
+* 5. Rendering der Lösung
 
-* 6. Camera Simulation
+* 6. Kamera Simulation
 
 
 === Szenario 2: Puzzle-Lösung
@@ -138,12 +134,10 @@ User          Flask        preprocessing/  piece_extraction/  edge_detection/  e
  │ GET /extract│           │               │                  │                │               │
  ├────────────>│           │               │                  │                │               │
  │             │           │               │                  │                │               │
- │             │ (check cache)             │                  │                │               │
  │             │           │               │                  │                │               │
  │             │ clean()   │               │                  │                │               │
  │             ├──────────>│               │                  │                │               │
  │             │           │ undistort()   │                  │                │               │
- │             │           │ (k1,k2,k3)    │                  │                │               │
  │             │           ├──────┐        │                  │                │               │
  │             │           │      │        │                  │                │               │
  │             │           │<─────┘        │                  │                │               │
@@ -153,10 +147,6 @@ User          Flask        preprocessing/  piece_extraction/  edge_detection/  e
  │             │           │               │                  │                │               │
  │             │ segment_pieces()          │                  │                │               │
  │             ├───────────┼──────────────>│                  │                │               │
- │             │           │               │ Grayscale        │                │               │
- │             │           │               │ Blur (kernel=7)  │                │               │
- │             │           │               │ Otsu Threshold   │                │               │
- │             │           │               │ Morphology       │                │               │
  │             │           │               │ findContours()   │                │               │
  │             │           │               ├──────────┐       │                │               │
  │             │           │               │          │       │                │               │
@@ -165,21 +155,17 @@ User          Flask        preprocessing/  piece_extraction/  edge_detection/  e
  │             │ pieces    │               │                  │                │               │
  │             │<──────────┼───────────────┤                  │                │               │
  │             │           │               │                  │                │               │
- │             │ (cache segmenter)         │                  │                │               │
  │             │           │               │                  │                │               │
  │ JSON resp.  │           │               │                  │                │               │
  │<────────────┤           │               │                  │                │               │
  │             │           │               │                  │                │               │
- │ GET /detect-edges      │               │                  │                │               │
+ │ GET /detect-edges       │               │                  │                │               │
  ├────────────>│           │               │                  │                │               │
  │             │           │               │                  │                │               │
  │             │ detect_edges()            │                  │                │               │
  │             ├───────────┼───────────────┼─────────────────>│                │               │
- │             │           │               │                  │ minAreaRect()  │               │
  │             │           │               │                  │ snap corners   │               │
  │             │           │               │                  │ extract edges  │               │
- │             │           │               │                  │ PCA angle      │               │
- │             │           │               │                  │ curvature sig. │               │
  │             │           │               │                  │ classify       │               │
  │             │           │               │                  │ (flat/tab/slot)│               │
  │             │           │               │                  ├──────────┐     │               │
@@ -192,17 +178,15 @@ User          Flask        preprocessing/  piece_extraction/  edge_detection/  e
  │ JSON resp.  │           │               │                  │                │               │
  │<────────────┤           │               │                  │                │               │
  │             │           │               │                  │                │               │
- │ GET /solve-puzzle      │               │                  │                │               │
+ │ GET /solve-puzzle       │               │                  │                │               │
  ├────────────>│           │               │                  │                │               │
  │             │           │               │                  │                │               │
- │             │ (re-run edge detection + matching internally)                 │               │
  │             │           │               │                  │                │               │
  │             │ find_matches()            │                  │                │               │
  │             ├───────────┼───────────────┼──────────────────┼───────────────>│               │
  │             │           │               │                  │                │ correlation   │
- │             │           │               │                  │                │ length_sim    │
- │             │           │               │                  │                │ class_compat  │
- │             │           │               │                  │                │ unique_best   │
+ │             │           │               │                  │                │ class compatibility
+ │             │           │               │                  │                │ find unique matches
  │             │           │               │                  │                ├──────────┐    │
  │             │           │               │                  │                │          │    │
  │             │           │               │                  │                │<─────────┘    │
@@ -214,40 +198,34 @@ User          Flask        preprocessing/  piece_extraction/  edge_detection/  e
  │             ├───────────┼───────────────┼──────────────────┼────────────────┼──────────────>│
  │             │           │               │                  │                │               │
  │             │           │               │                  │                │ identify_corners()
- │             │           │               │                  │                │ (2 flat edges)
+ │             │           │               │                  │                │ (piece with 2 flat edges)
  │             │           │               │                  │                │               │
  │             │           │               │                  │                │ try_each_corner()
  │             │           │               │                  │                │ as top-left
  │             │           │               │                  │                │               │
  │             │           │               │                  │                │ greedy_expand()
- │             │           │               │                  │                │ via matches
+ │             │           │               │                  │                │ via matches   │
  │             │           │               │                  │                │               │
  │             │           │               │                  │                │ calculate_rotations()
- │             │           │               │                  │                ├──────────┐
- │             │           │               │                  │                │          │
- │             │           │               │                  │                │<─────────┘
- │             │           │               │                  │                │
- │             │ solution  │               │                  │                │
+ │             │           │               │                  │                ├──────────┐    │
+ │             │           │               │                  │                │          │    │
+ │             │           │               │                  │                │<─────────┘    │
+ │             │           │               │                  │                │               │
+ │             │ solution  │               │                  │                │               │
  │             │<──────────┼───────────────┼──────────────────┼────────────────┼───────────────┤
  │             │           │               │                  │                │               │
  │ JSON resp.  │           │               │                  │                │               │
  │<────────────┤           │               │                  │                │               │
- │ {grid_layout,│          │               │                  │                │               │
- │  placed_pieces,│        │               │                  │                │               │
- │  confidence}│           │               │                  │                │               │
+ │ { grid_layout,          │               │                  │                │               │
+ │  placed_pieces,         │               │                  │                │               │
+ │  confidence score }     │               │                  │                │               │
 ----
 
 ==== Wichtige Schritte
 
 * 1. Global Cleaning
-* 2. Segmentation
-* 3. Edge Detection
-* 4. Edge Matching
-* 5. Solving
-
-==== Besonderheiten
-
-* **Caching**: Segmenter wird gecacht → min_score Änderung ohne Re-Segmentierung
-* **Corner-Start**: Nutzt Constraint "alle Teile haben ≥1 flat edge"
-* **Greedy Expansion**: Schnell, aber lokal optimal (keine Backtracking)
+* 2. Segmentierung
+* 3. Kantenerkennung
+* 4. Kanten-Matching
+* 5. Puzzle lösen
 

@@ -34,12 +34,6 @@ package "PREN Puzzle Simulator" {
     [Solver Algorithm] as SolverAlgo
   }
 
-  package "Shared Infrastructure" {
-    [Configuration] as Config
-    [Performance Tracking] as Perf
-    [Visualization] as Visual
-    [File Storage] as Storage
-  }
 
   Flask --> GenAPI
   Flask --> SolverAPI
@@ -55,13 +49,6 @@ package "PREN Puzzle Simulator" {
   SolverAPI --> EdgeMatch
   SolverAPI --> SolverAlgo
 
-  GenAPI ..> Config
-  SolverAPI ..> Config
-  GenAPI ..> Perf
-  SolverAPI ..> Perf
-  SolverAPI ..> Visual
-  SolverAPI ..> Storage
-  GenAPI ..> Storage
 }
 
 @enduml
@@ -82,8 +69,6 @@ package "PREN Puzzle Simulator" {
 | **Puzzle Solver Subsystem**
 | Analysiert Puzzle-Bilder und rekonstruiert die Lösung
 
-| **Shared Infrastructure**
-| Gemeinsame Utilities für Konfiguration, Performance, Visualisierung
 |===
 
 ==== Wichtige Schnittstellen
@@ -109,7 +94,8 @@ package "PREN Puzzle Simulator" {
 
 ==== Übersichtsdiagramm
 
-```
+[source]
+----
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Puzzle Generator Subsystem                    │
 └─────────────────────────────────────────────────────────────────┘
@@ -119,7 +105,7 @@ package "PREN Puzzle Simulator" {
          ┌──────────────────┐   ┌──────────────────┐
          │  routes.py       │   │  api.py          │
          │                  │   │                  │
-         │  POST /generate  │──▶│  generate_      │
+         │  POST /generate  │──▶│  generate_       │
          │  POST /calibrate │   │  puzzle_images() │
          │  GET  /health    │   │                  │
          └──────────────────┘   └──────────────────┘
@@ -131,10 +117,10 @@ package "PREN Puzzle Simulator" {
     ├─────────────────┤      ├─────────────────┤   ├─────────────────┤
     │                 │      │                 │   │                 │
     │  puzzle.py      │      │  renderer.py    │   │  camera.py      │
-    │  • Generator    │─────▶│  • Renderer     │◀──│  • Simulator    │
+    │  • Generator    │─────▶│  • Renderer     │◀──│                 │
     │  • PuzzlePiece  │      │  • Shadow       │   │                 │
-    │  • PieceEdge    │      │  • Watermark    │   │  effects/       │
-    │                 │      │                 │   │  • 11 Effects   │
+    │  • PieceEdge    │      │                 │   │  effects/       │
+    │                 │      │                 │   │  • 11 Types     │
     │  cuts.py        │      │                 │   │                 │
     │  • Cut (ABC)    │      │                 │   │                 │
     │  • 13 Impls     │      │                 │   │                 │
@@ -148,72 +134,66 @@ package "PREN Puzzle Simulator" {
     │  • Generator    │                           │  grid_          │
     │    Config       │                           │  calibrator.py  │
     │  • Puzzle       │                           │                 │
-    │    Config       │                           │  • Hough Lines  │
-    │  • Render       │                           │  • SciPy        │
-    │    Config       │                           │    Optimize     │
+    │    Config       │                           │                 │
     │  • Camera       │                           │                 │
     │    Config       │                           │                 │
     │  • Output       │                           │                 │
     │    Config       │                           │                 │
     └─────────────────┘                           └─────────────────┘
-```
+----
 
 ==== Enthaltene Bausteine
 
-[cols="1,3,1" options="header"]
+[cols="1,2" options="header"]
 |===
-| Baustein | Verantwortlichkeit | Technologie
+| Baustein | Verantwortlichkeit
 
 | **routes.py**
 | Flask-Routen, Request Parsing, Response Serialization
-| Flask Blueprints
 
 | **api.py**
 | Business Logic, Orchestrierung der Pipeline
-| Pure Python
 
 | **geometry/**
 | Parametrische Puzzle-Generierung, Cut-Algorithmen
-| NumPy
 
 | **rendering/**
-| Bild-Rendering, Schatten, Wasserzeichen
-| Pillow (PIL)
+| Bild-Rendering, Schatten
 
 | **simulation/**
 | Kamera-Effekt-Pipeline (11 Effects)
-| OpenCV, NumPy
 
 | **calibration/**
 | Barrel Distortion Kalibrierung
-| OpenCV, SciPy
 
 | **config.py**
 | Typsichere Konfiguration
-| Python Dataclasses
+
+
 |===
 
-=== Whitebox Puzzle Solver (Ebene 2)
+=== Puzzle Solver (Ebene 2)
 
 ==== Übersichtsdiagramm
 
-```
+[source]
+----
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Puzzle Solver Subsystem                       │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                    ┌─────────┴──────────┐
-                    ▼                    ▼
-         ┌──────────────────┐   ┌──────────────────────┐
-         │  routes.py       │   │  (Inline in routes)  │
-         │                  │   │                      │
-         │  POST /upload    │   │  Pipeline Logic:     │
-         │  GET  /extract   │   │  • Cache segmenters  │
-         │  GET  /detect-   │   │  • Cache cleaners    │
-         │       edges      │   │  • Orchestrate steps │
-         │  GET  /solve-    │   │                      │
-         │       puzzle     │   │                      │
-         └──────────────────┘   └──────────────────────┘
+                              ┴──────────┐
+                                         ▼
+                                ┌──────────────────┐
+                                │  routes.py       │
+                                │                  │
+                                │  POST /upload    │
+                                │  GET  /extract   │
+                                │  GET  /detect-   │
+                                │       edges      │
+                                │  GET  /solve-    │
+                                │       puzzle     │
+                                └──────────────────┘
                                         │
        ┌────────────────────────────────┼─────────────────────────┐
        ▼                                ▼                         ▼
@@ -222,18 +202,14 @@ package "PREN Puzzle Simulator" {
 ├──────────────┤              ├──────────────────┤     ├──────────────────┤
 │              │              │                  │     │                  │
 │global_       │              │extractor.py      │     │edge_detector.py  │
-│cleaner.py    │──────────────▶│• PieceSegmenter │────▶│• EdgeDetector    │
+│cleaner.py    │─────────────▶│• PieceSegmenter │─────▶│• EdgeDetector    │
 │              │              │• PuzzlePiece     │     │• PieceEdge       │
-│• Barrel      │              │                  │     │                  │
-│  Distortion  │              │extractor_        │     │edge_detector_    │
-│• Perspective │              │visualizer.py     │     │visualizer.py     │
-│• Vignette    │              │• PieceVisualizer │     │• EdgeVisualizer  │
-│• Chromatic   │              │                  │     │                  │
-│  Aberration  │              │                  │     │                  │
+│image_clean.py│              │                  │     │                  │
+│              │              │extractor_        │     │edge_detector_    │
+│              │              │visualizer.py     │     │visualizer.py     │
+│              │              │• PieceVisualizer │     │• EdgeVisualizer  │
 │              │              │                  │     │                  │
-│image_        │              │                  │     │                  │
-│cleaner.py    │              │                  │     │                  │
-│• Morphology  │              │                  │     │                  │
+│              │              │                  │     │                  │
 └──────────────┘              └──────────────────┘     └──────────────────┘
                                                                  │
                               ┌──────────────────────────────────┤
@@ -252,35 +228,29 @@ package "PREN Puzzle Simulator" {
                     │                  │              │• Solution        │
                     │                  │              │  Visualizer      │
                     └──────────────────┘              └──────────────────┘
-```
+----
 
 ==== Enthaltene Bausteine
 
-[cols="1,3,1" options="header"]
+[cols="1,2" options="header"]
 |===
-| Baustein | Verantwortlichkeit | Technologie
+| Baustein | Verantwortlichkeit
 
 | **preprocessing/**
 | Globale (Kamera) und lokale (Kontur) Korrekturen
-| OpenCV
 
 | **piece_extraction/**
-| Segmentierung, Otsu Thresholding, Morphologie
-| OpenCV
+| Segmentierung, Otsu Verfahren
 
 | **edge_detection/**
-| Eck-Erkennung, Kanten-Extraktion, PCA, Klassifikation
-| OpenCV, NumPy
+| Eck-Erkennung, Kanten-Extraktion und Kanten-Klassifikation
 
 | **edge_matching/**
-| Curvature-Korrelation, Length/Class Compatibility
-| NumPy (Correlation)
+| Kurvenkorrelation, Tab-Slot-Kompatibilität
 
 | **solver/**
-| Graph-basiertes Solving, Corner-Start, Greedy Expansion
-| Pure Python
+| Corner-Start, Greedy Expansion
 
 | **Visualizers**
 | PNG-Outputs für alle Pipeline-Stufen
-| OpenCV, Pillow
 |===
