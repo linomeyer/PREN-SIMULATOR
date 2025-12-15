@@ -1,0 +1,29 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-architecture-decisions]]
+== Qualitätsanforderungen
+
+[cols="1,1,2" options="header"]
+|===
+| Priorität | Qualitätsziel | Beschreibung
+
+| 1
+| **Realitätsnähe**
+| Die generierten Puzzle-Bilder müssen die tatsächlichen Kamerabedingungen (Verzerrung, Rauschen, Schatten) möglichst exakt simulieren, um realistische Testszenarien zu schaffen.
+
+| 2
+| **Robustheit**
+| Der Solver muss zuverlässig Puzzles unter verschiedenen Bedingungen lösen können (unterschiedliche Schnittformen, Rotationen, Beleuchtungsverhältnisse).
+
+| 3
+| **Nachvollziehbarkeit**
+| Alle Pipeline-Schritte (von der Vorverarbeitung bis zur Lösung) müssen visualisiert und nachvollziehbar sein, um Fehleranalyse und Debugging möglichst einfach zu gestalten.
+
+| 4
+| **Konfigurierbarkeit**
+| Parameter für Puzzle-Generierung und Solver-Algorithmen müssen über REST-API steuerbar sein.
+
+| 5
+| **Performance**
+| Die komplette Pipeline (Generierung + Solving) sollte in <30 Sekunden ablaufen, damit der physische Roboter im Wettbewerg genügend Zeit hat das Puzzle zu lösen
+|===

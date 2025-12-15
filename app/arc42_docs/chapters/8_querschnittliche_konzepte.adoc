@@ -11,7 +11,7 @@ Dieses Kapitel beschreibt übergreifende Konzepte und Lösungsansätze, die in m
 
 ==== Konzept
 
-Alle Parameter werden über **typsichere Python Dataclasses** verwaltet, keine Plain Dicts oder Magic Strings.
+Sofern sinnvoll werden alle Parameter über **typsichere Python Dataclasses** verwaltet keine Plain Dicts oder Magic Strings.
 
 ==== Implementierung
 
@@ -81,7 +81,7 @@ Einheitliche JSON-Error-Responses auf allen REST-Endpunkten.
 
 ==== Visualisierungs-Pipeline
 
-**Strategie**: Jede Pipeline-Stufe erzeugt Debug-PNG in `app/static/output/`
+**Strategie**: Jede Pipeline-Stufe erzeugt "Debug"-PNG in `app/static/output/` zur Validierung der Outputs des Puzzle-Lösungsprozesses
 
 [cols="1,2" options="header"]
 |===
@@ -94,7 +94,7 @@ Einheitliche JSON-Error-Responses auf allen REST-Endpunkten.
 | `edges_<filename>_<id>.png` (Konturen + Ecken + Labels)
 
 | **Matching**
-| `matches_<filename>_<id>.png` (Side-by-Side Edge-Pairs mit Scores)
+| `matches_<filename>_<id>.png` (Side-by-Side Kantenpaare mit Scores)
 
 | **Solution**
 | `solution_grid_<filename>.png`, `solution_render_<filename>.png`
@@ -109,7 +109,7 @@ Via REST-API: `GET /output/<filename>.png`
 
 ==== Seed-basierte Generierung
 
-**Generator** nutzt Seeds für deterministisches Verhalten:
+**Generator** nutzt Seeds um reproduzierbare Puzzles zu ermöglichen. Seed wird random gewählt ausser dieser wird spezifisch angegeben
 
 [source,python]
 ----
@@ -120,5 +120,4 @@ if seed is not None:
 **Vorteile**:
 
 * Exakte Reproduzierbarkeit von Test-Puzzles
-* Bug-Reports mit Seed → 100% nachvollziehbar
-* A/B Testing verschiedener Algorithmen
+* Ermöglicht A/B Testing verschiedener Algorithmen

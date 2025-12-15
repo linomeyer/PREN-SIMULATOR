@@ -50,23 +50,6 @@ erleichtert Segmentierung durch Kontrast zum weißen Hintergrund
 | Im gelösten Zustand: ~1mm Abstand zwischen Teilen
 |===
 
-
-=== Deployment move to 7?
-
-[cols="1,3" options="header"]
-|===
-| Randbedingung | Erläuterung
-
-| **Virtualenv**
-| Isolierte Python-Umgebung; keine System-weiten Installationen
-
-| **Lokaler Betrieb**
-| Kein Cloud-Dependency; vollständig offline lauffähig für Wettbewerb
-
-| **File-based Storage**
-| Keine Datenbank; Zwischenergebnisse und Visualisierungen in `app/static/output`
-|===
-
 === API-Konventionen remove?
 
 [cols="1,3" options="header"]

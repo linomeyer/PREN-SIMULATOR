@@ -1,0 +1,112 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-context-and-scope]]
+== Kontext und Abgrenzung
+
+=== Fachlicher Kontext
+
+[cols="1,3" options="header"]
+|===
+| Nachbarsystem | Schnittstelle
+
+| **Entwickler**
+| REST-API (`/generate`, `/solve-puzzle`, `/calibrate`) +
+Steuert Generator und Solver über HTTP-Requests
+
+| **Physischer Puzzle-Roboter** +
+(zukünftig)
+| Übernimmt Solver-Algorithmen und wendet sie auf reale Kamera-Bilder an
+
+| **Puzzle Generator**
+| Erzeugt synthetische Puzzle-Bilder (4608×2592 px) mit simulierten Kamera-Imperfektionen für realitätsnahe Tests der Lösung des Puzzles
+
+|===
+
+=== Technischer Kontext (Simulator)
+
+**Entwicklungs-/Test-Kontext mit selbst generierten Puzzles:**
+
+[plantuml, format=svg]
+....
+@startuml
+actor Entwickler
+
+node "Puzzle Simulator" {
+  [Generator API] as Gen
+  [Solver API] as Solver
+}
+
+database "File System" as FS
+
+Entwickler --> Gen : POST /generate
+Gen --> FS : Puzzle-Bilder
+Gen --> Entwickler : Simulierte Bilder
+
+Entwickler --> Solver : POST /solve-puzzle
+Solver --> FS : Visualisierungen
+Solver --> Entwickler : Gelöstes Puzzle
+@enduml
+....
+
+=== Technischer Kontext (phyisischer Roboter - zukünftig)
+
+[plantuml, format=svg]
+....
+@startuml
+node "Physischer Puzzle-Roboter" {
+  [RaspberryPi Kamera] as Cam
+  [Roboter-Steuerung] as RobotCtrl
+  [Greifer/Motoren] as Hardware
+}
+
+node "Puzzle Solver (RasPi 5)" {
+  [Solver API] as Solver
+}
+
+database "File System" as FS
+
+Cam --> Solver : Bild gespeichert\nPOST /solve-puzzle wird ausgelöst\n(Reales Puzzle-Bild)
+Solver --> FS : Speichert Visualisierungen\n(optional)
+Solver --> RobotCtrl : JSON Response:\n- Piece IDs\n- Positionen (x, y)\n- Rotationen der Teile
+RobotCtrl --> Hardware : Bewegungsanweisungen:\n- Greife Teil A\n- Rotiere um B°\n- Platziere an (x, y)
+@enduml
+....
+
+=== Abgrenzung
+
+==== Was der Simulator **IST**
+
+[cols="2,3" options="header"]
+|===
+| Funktion | Beschreibung
+
+| **Software-Entwicklungsumgebung**
+| Ermöglicht frühe Entwicklung und Test von Puzzle-Solver-Algorithmen ohne physische Hardware
+
+| **Generator realistischer Test-Daten**
+| Simuliert Kamera-Imperfektionen (Verzerrung, Schatten, etc.) für realitätsnahe Tests
+
+| **Visualisierungs-Tool**
+| Zeigt jeden Pipeline-Schritt (Segmentierung → Edge Detection → Matching → Solving) visuell
+
+| **Reproduzierbares Test-System**
+| Seed-basierte Generierung garantiert identische Puzzles für A/B-Tests
+
+|===
+
+==== Was der Simulator **NICHT IST**
+
+[cols="2,3" options="header"]
+|===
+| Kein | Begründung
+
+| **Ersatz für physische Tests**
+| Generierte Bilder können reale Bedingungen nur approximieren (Reflexionen, Schatten)
+
+| **Roboter-Steuerungssoftware**
+| Keine Anbindung an Motoren, Greifer oder Hardware-Controller
+
+| **Produktionsreife Lösung**
+| Proof-of-Concept, nicht Wettbewerbsreif
+
+|===

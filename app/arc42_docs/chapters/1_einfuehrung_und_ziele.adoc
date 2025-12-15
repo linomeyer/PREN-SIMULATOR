@@ -12,31 +12,3 @@ Der Simulator umfasst zwei Hauptkomponenten:
 1. **Puzzle Generator**: Erzeugt realistische Puzzle-Bilder mit konfigurierbaren Kamera-Effekten (Barrel Distortion, Vignettierung, Rauschen, etc.), um die Aufnahmebedingungen einer RaspberryPi Kamera zu simulieren.
 
 2. **Puzzle Solver**: Analysiert die generierten Bilder und löst das Puzzle durch Bilderkennung, Kantenerkennung, Edge-Matching und Layout-Rekonstruktion.
-
-
-=== Qualitätsziele move
-
-[cols="1,2,2" options="header"]
-|===
-| Priorität | Qualitätsziel | Beschreibung
-
-| 1
-| **Realitätsnähe**
-| Die generierten Puzzle-Bilder müssen die tatsächlichen Kamerabedingungen (Verzerrung, Rauschen, chromatische Aberration) möglichst exakt simulieren, um realistische Testszenarien zu schaffen.
-
-| 2
-| **Robustheit**
-| Der Solver muss zuverlässig Puzzles unter verschiedenen Bedingungen lösen können (unterschiedliche Schnittformen, Rotationen, Beleuchtungsverhältnisse).
-
-| 3
-| **Nachvollziehbarkeit**
-| Alle Pipeline-Schritte (von der Vorverarbeitung bis zur Lösung) müssen visualisiert und nachvollziehbar sein, um Fehleranalyse und Debugging möglichst einfach zu gestalten.
-
-| 4
-| **Konfigurierbarkeit**
-| Parameter für Puzzle-Generierung (Schnittformen, Layout, Kamera-Effekte) und Solver-Algorithmen (Schwellwerte, Morph-Kernels) müssen über REST-API steuerbar sein.
-
-| 5
-| **Performance**
-| Die komplette Pipeline (Generierung + Solving) sollte in <30 Sekunden ablaufen, um iterative Tests zu ermöglichen.
-|===

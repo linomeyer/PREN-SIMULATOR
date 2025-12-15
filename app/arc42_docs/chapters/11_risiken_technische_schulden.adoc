@@ -1,0 +1,61 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-technical-risks]]
+== Risiken und technische Schulden
+
+=== Technische Schulden
+
+[cols="2,2,1" options="header"]
+|===
+| Technische Schuld | Auswirkung | Priorität
+
+| **Nur rechteckige Puzzles** +
+Edge Detection nutzt `minAreaRect` → funktioniert nur für 4-Eck-Teile
+| Im Wettbewerb können andere Formen vorkommen (Hexagone, organische Formen) → Solver versagt
+| Hoch
+
+| **Kantenlängen-Abhängigkeit** +
+Edge Matching vergleicht Kurvenkorrelation ohne Normalisierung
+| Kanten mit stark unterschiedlichen Längen matchen schlecht → False Negatives
+| Mittel
+
+| **Keine Real-Welt-Validierung** +
+Solver nur mit generierten Bildern getestet
+| Unbekannte Fehlerquellen in realen Bedingungen (Reflexionen, Schatten, Farbvariationen)
+| Mittel
+
+|===
+
+=== Risiken
+
+[cols="2,2,1" options="header"]
+|===
+| Risiko | Mitigation | Wahrscheinlichkeit
+
+| **Nicht-rechteckige Puzzles im Wettbewerb**
+| Fallback: Manuelle Intervention; Zeit für Anpassung einplanen
+| Hoch
+
+| **Generator simuliert Kamera ungenau**
+| Reale Testbilder mit RasPi Kamera aufnehmen und damit testen und optimieren
+| Mittel
+
+| **Performance auf RasPi 5 ungenügend**
+| Code-Profiling durchführen; Algorithmen optimieren
+| Niedrig
+
+|===
+
+=== Mögliche Maßnahmen
+
+1. **Erweitern der Edge Detection** +
+   → Implementierung einer form-agnostischen Eckenermittlung (z.B. Douglas-Peucker Simplification)
+
+2. **Real-Welt-Tests** +
+   → Echte Puzzle-Bilder mit RasPi Kamera testen
+
+3. **Kantenlängen-Normalisierung** +
+   → Edge Matching auf relative Krümmung statt absolute Werte umstellen
+
+4. **Performance-Profiling** +
+   → Laufzeitmessungen auf RasPi 5 durchführen und Bottlenecks identifizieren

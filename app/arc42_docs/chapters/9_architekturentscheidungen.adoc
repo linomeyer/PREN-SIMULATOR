@@ -10,7 +10,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 **Lösung**:
 - Generator erstellt Puzzles mit konfigurierbaren Parametern (Seed, Cut-Types, Kamera-Effekte)
 - Solver arbeitet ausschließlich mit Bildern
-- Communication-Only Interface über REST-API
 
 
 === 2. Klassische Computer Vision statt Machine Learning
@@ -19,17 +18,17 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 **Lösung**:
 
-Bewusster Einsatz klassischer CV-Algorithmen
+Bewusster Einsatz von CV-Algorithmen
 
 **Begründung**:
 
 - **Interpretierbarkeit**: Jeder Schritt ist nachvollziehbar und debuggbar
 
-- **Keine Training-Daten**: Keine großen Puzzle-Datensätze verfügbar
+- **Keine Trainingsdaten**: Keine großen Puzzle-Datensätze verfügbar
 
 - **Erfahrung**: Wenig Grundwissen und Erfahrung in diesem Bereich
 
-=== 3. Pipeline-Architektur mit Zwischenspeicherung
+=== 3. Pipeline-Lösungsprozess der Puzzles
 
 **Problem**: Der Puzzle-Simulator könnte das Puzzle per Knopfdruck in "einem Schritt" lösen, aber dadurch wäre die manuelle testbarkeit der einzelnen Schritte sehr eingeschränkt.
 
