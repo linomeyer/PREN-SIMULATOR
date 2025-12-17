@@ -25,5 +25,5 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | 5
 | **Performance**
-| Die komplette Pipeline (Generierung + Solving) sollte in <30 Sekunden ablaufen, damit der physische Roboter im Wettbewerg genügend Zeit hat das Puzzle zu lösen
+| Die komplette Pipeline (Generierung + Solving) sollte in <30 Sekunden ablaufen, damit der physische Roboter im Wettbewerb genügend Zeit hat das Puzzle zu lösen
 |===

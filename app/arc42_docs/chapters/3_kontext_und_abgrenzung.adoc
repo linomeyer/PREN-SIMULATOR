@@ -59,7 +59,7 @@ node "Physischer Puzzle-Roboter" {
   [Greifer/Motoren] as Hardware
 }
 
-node "Puzzle Solver (RasPi 5)" {
+node "Puzzle Solver (RaspberryPi 5)" {
   [Solver API] as Solver
 }
 

@@ -8,6 +8,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 **Problem**: Entwicklung und Test der Solver-Algorithmen benötigt reproduzierbare, realitätsnahe Puzzle-Bilder.
 
 **Lösung**:
+
 - Generator erstellt Puzzles mit konfigurierbaren Parametern (Seed, Cut-Types, Kamera-Effekte)
 - Solver arbeitet ausschliesslich mit Bildern
 
@@ -18,7 +19,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 **Lösung**:
 
-Bewusster Einsatz von CV-Algorithmen
+- Bewusster Einsatz von CV-Algorithmen
 
 **Begründung**:
 
@@ -26,7 +27,7 @@ Bewusster Einsatz von CV-Algorithmen
 
 - **Keine Trainingsdaten**: Keine grossen Puzzle-Datensätze verfügbar
 
-- **Erfahrung**: Wenig Grundwissen und Erfahrung in diesem Bereich
+- **Erfahrung**: Wenig Grundwissen und Erfahrung im Deep Learning Bereich
 
 === 3. Pipeline-Lösungsprozess der Puzzles
 
@@ -34,7 +35,7 @@ Bewusster Einsatz von CV-Algorithmen
 
 **Lösung**:
 
-Lösung des Puzzles als Pipeline in einzelnen Teilschritten.
+- Lösung des Puzzles als Pipeline in einzelnen Teilschritten.
 
 **Begründung**:
 
@@ -44,9 +45,9 @@ Lösung des Puzzles als Pipeline in einzelnen Teilschritten.
 
 === 4. Generierte Puzzles müssen vielseitig und reproduzierbar sein
 
-**Problem**: Puzzle-Schnittformen müssen vielfältig und perfekt passend sein.
+**Problem**: Puzzle-Schnittformen müssen vielfältig und passend sein.
 
-**Lösung**: Abstract Base Class `Cut` mit 13 Implementierungen und einer seed basierten Random-Generierung
+**Lösung**: Abstract Base Class `Cut` mit 13 Implementierungen und einer seed basierten Generierung
 
 - **Male/Female Pairing**: `ReversedCut` Wrapper macht es einfach Gegenstücke zu generieren
 
