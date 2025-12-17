@@ -3,6 +3,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-architecture-decisions]]
 == Qualitätsanforderungen
 
+Die nachfolgende Tabelle definiert die zentralen Qualitätsziele des Puzzle-Simulators in priorisierter Reihenfolge. Sie dienen als Leitplanken für Architektur- und Implementierungsentscheidungen.
+
 [cols="1,1,2" options="header"]
 |===
 | Priorität | Qualitätsziel | Beschreibung
@@ -25,5 +27,5 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | 5
 | **Performance**
-| Die komplette Pipeline (Generierung + Solving) sollte in <30 Sekunden ablaufen, damit der physische Roboter im Wettbewerb genügend Zeit hat das Puzzle zu lösen
+| Die komplette Pipeline des Solving sollte in <30 Sekunden ablaufen, damit der physische Roboter im Wettbewerb genügend Zeit hat das Puzzle zu lösen
 |===

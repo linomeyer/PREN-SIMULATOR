@@ -3,6 +3,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-architecture-decisions]]
 == Architekturentscheidungen
 
+Die folgenden Entscheidungen haben die Architektur des Puzzle-Simulators massgeblich geprägt. Sie werden jeweils mit dem zugrundeliegenden Problem, der gewählten Lösung und deren Begründung dokumentiert.
+
 === 1. Strikte Trennung Generator / Solver
 
 **Problem**: Entwicklung und Test der Solver-Algorithmen benötigt reproduzierbare, realitätsnahe Puzzle-Bilder.

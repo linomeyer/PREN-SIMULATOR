@@ -3,8 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-solution-strategy]]
 == Lösungsstrategie
 
-=== Überblick
-
 Die Gesamtlösung besteht aus **zwei unabhängigen, aber komplementären Subsystemen**, die über eine gemeinsame Flask-REST-API kommunizieren:
 
 [cols="1,2,2" options="header"]

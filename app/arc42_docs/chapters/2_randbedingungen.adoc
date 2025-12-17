@@ -3,6 +3,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-architecture-constraints]]
 == Randbedingungen
 
+Dieses Kapitel definiert die technischen, fachlichen und organisatorischen Rahmenbedingungen, innerhalb derer die Architektur des Puzzle-Simulators entwickelt wurde.
+
 === Technische Randbedingungen
 
 [cols="1,3" options="header"]
@@ -25,7 +27,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 | Ziel-Hardware
 |===
 
-=== Puzzle-Geometrie
+=== Randbedingungen zur Puzzle-Geometrie
 
 [cols="1,3" options="header"]
 |===
@@ -48,19 +50,6 @@ erleichtert Segmentierung durch Kontrast zum weissen Hintergrund
 
 | **Toleranz zwischen Teilen**
 | Im gelösten Zustand: ~1mm Abstand zwischen Teilen
-|===
-
-=== API-Konventionen remove?
-
-[cols="1,3" options="header"]
-|===
-| Konvention | Erläuterung
-
-| **JSON-Responses**
-| Alle API-Antworten im JSON-Format mit `success`/`error` Status
-
-| **Query-Parameter**
-| Optionale Parameter über URL-Query (`?min_score=0.5`)
 |===
 
 === Organisatorische Randbedingungen

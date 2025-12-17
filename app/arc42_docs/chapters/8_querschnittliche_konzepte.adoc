@@ -3,8 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-concepts]]
 == Querschnittliche Konzepte
 
-=== Überblick
-
 Dieses Kapitel beschreibt übergreifende Konzepte und Lösungsansätze, die in mehreren Bausteinen verwendet werden.
 
 === Konfigurationsverwaltung

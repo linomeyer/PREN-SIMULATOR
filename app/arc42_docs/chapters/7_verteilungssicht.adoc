@@ -3,16 +3,18 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-deployment-view]]
 == Verteilungssicht
 
+Dieses Kapitel beschreibt die technische Infrastruktur und Deployment-Architektur des Puzzle-Simulators. Der Simulator läuft vollständig lokal als monolithische Flask-Anwendung ohne externe Abhängigkeiten.
+
 [cols="1,3" options="header"]
 |===
 | Randbedingung | Erläuterung
 
 | **Virtualenv**
-| Isolierte Python-Umgebung; keine System-weiten Installationen
+| Isolierte Python-Umgebung; es sind keine System-weiten Installationen nötig
 
 | **Lokaler Betrieb**
-| Kein Cloud-Dependency; vollständig offline lauffähig für Wettbewerb
+| Keine Abhängigkeiten zur Cloud oder dem Internet; vollständig offline lauffähig.
 
 | **File-based Storage**
-| Keine Datenbank; Zwischenergebnisse und Visualisierungen lokal in `app/static/output`
+| Keine Datenbank; Zwischenergebnisse und Visualisierungen lokal in `app/static/output` als Dateien gespeichert
 |===

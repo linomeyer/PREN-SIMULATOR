@@ -3,6 +3,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-context-and-scope]]
 == Kontext und Abgrenzung
 
+Dieses Kapitel beschreibt das Umfeld des Puzzle-Simulators und grenzt ihn gegenüber Nachbarsystemen ab. Es zeigt die fachlichen und technischen Schnittstellen zu externen Akteuren sowie die klare Definition, was der Simulator leistet und was nicht.
+
 === Fachlicher Kontext
 
 [cols="1,3" options="header"]

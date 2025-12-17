@@ -4,6 +4,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-building-block-view]]
 == Bausteinsicht
 
+Die Bausteinsicht des Systems zeigt auf der ersten Ebene die Hauptkomponenten des Simulators. Die zweite Ebene verfeinert die beiden Subsysteme (Generator und Solver) in ihre internen Bausteine mit deren Verantwortlichkeiten und Abhängigkeiten.
+
 === Gesamtsystem (Ebene 1)
 
 ==== Übersichtsdiagramm

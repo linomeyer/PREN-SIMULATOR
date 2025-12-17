@@ -3,8 +3,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-runtime-view]]
 == Laufzeitsicht
 
-=== Überblick
-
 Dieses Kapitel beschreibt die wichtigsten Ablaufszenarien des Systems zur Laufzeit. Es zeigt, wie die in Kapitel 5 beschriebenen Bausteine zusammenarbeiten, um die Hauptfunktionalitäten zu realisieren.
 
 **Abgedeckte Szenarien:**
