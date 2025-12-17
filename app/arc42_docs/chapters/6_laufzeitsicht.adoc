@@ -20,84 +20,60 @@ Ein Entwickler möchte ein neues Test-Puzzle mit realistischen Kamera-Effekten g
 
 ==== Ablauf
 
-[source]
-----
-User                Flask           api.py          geometry/       rendering/      simulation/
- │                   │               │               puzzle.py       renderer.py     camera.py
- │                   │               │               │               │               │
- │ POST /generate    │               │               │               │               │
- ├──────────────────>│               │               │               │               │
- │ {seed: 42,        │               │               │               │               │
- │  cut_types: [...],│               │               │               │               │
- │  layout: "2x3"}   │               │               │               │               │
- │                   │               │               │               │               │
- │                   │ parse params  │               │               │               │
- │                   ├──────────────>│               │               │               │
- │                   │               │               │               │               │
- │                   │               │ generate()    │               │               │
- │                   │               ├──────────────>│               │               │
- │                   │               │               │               │               │
- │                   │               │               │ _assign_edge_cuts()           │
- │                   │               │               │ (Male/Female Pairing)         │
- │                   │               │               ├──────────┐    │               │
- │                   │               │               │          │    │               │
- │                   │               │               │<─────────┘    │               │
- │                   │               │               │               │               │
- │                   │               │               │ _create_piece() (6x)          │
- │                   │               │               ├──────────┐    │               │
- │                   │               │               │          │    │               │
- │                   │               │               │<─────────┘    │               │
- │                   │               │               │               │               │
- │                   │               │               │ _randomize_placement()        │
- │                   │               │               │ (Grid + Rotation)             │
- │                   │               │               ├──────────┐    │               │
- │                   │               │               │          │    │               │
- │                   │               │               │<─────────┘    │               │
- │                   │               │               │               │               │
- │                   │               │ pieces        │               │               │
- │                   │               │<──────────────┤               │               │
- │                   │               │               │               │               │
- │                   │               │ render_clean()│               │               │
- │                   │               ├───────────────┼──────────────>│               │
- │                   │               │               │               │               │
- │                   │               │               │               │ _render_shadow()
- │                   │               │               │               ├──────────┐
- │                   │               │               │               │          │
- │                   │               │               │               │<─────────┘
- │                   │               │               │               │
- │                   │               │               │               │ _render_pieces()
- │                   │               │               │               ├──────────┐
- │                   │               │               │               │          │
- │                   │               │               │               │<─────────┘
- │                   │               │               │               │
- │                   │               │ clean_image   │               │
- │                   │               │<──────────────┼───────────────┤
- │                   │               │               │               │
- │                   │               │ render_solution()             │
- │                   │               ├───────────────┼──────────────>│
- │                   │               │               │               │
- │                   │               │ solution_img  │               │
- │                   │               │<──────────────┼───────────────┤
- │                   │               │               │               │
- │                   │               │ apply_camera_sim()            │
- │                   │               ├───────────────┼───────────────┼──────────────>│
- │                   │               │               │               │               │
- │                   │               │               │               │        barrel_distortion()
- │                   │               │               │               │        perspective()
- │                   │               │               │               │        chromatic_aberration()
- │                   │               │               │               │               │
- │                   │               │ noisy_image   │               │               │
- │                   │               │<──────────────┼───────────────┼───────────────┤
- │                   │               │               │               │               │
- │                   │ result        │               │               │               │
- │                   │<──────────────┤               │               │               │
- │                   │               │               │               │               │
- │ JSON response     │               │               │               │               │
- │<──────────────────┤               │               │               │               │
- │ {noisy_image,     │               │               │               │               │
- │  solution_image,  │               │               │               │               │
- │  metadata}        │               │               │               │               │
-----
+[plantuml, format=svg]
+....
+@startuml
+
+participant User
+participant "Flask" as Flask
+participant "api.py" as API
+participant "geometry/\npuzzle.py" as Puzzle
+participant "rendering/\nrenderer.py" as Renderer
+participant "simulation/\ncamera.py" as Camera
+
+User -> Flask: POST /generate\n{seed: 420381,\ncut_types: [...],\nlayout: "2x3"}
+
+Flask -> API: parse params
+
+API -> Puzzle: generate()
+
+activate Puzzle
+Puzzle -> Puzzle: _assign_edge_cuts()\n(Male/Female Pairing)
+Puzzle -> Puzzle: _create_piece() (6x)
+Puzzle -> Puzzle: _randomize_placement()\n(Grid + Rotation)
+deactivate Puzzle
+
+Puzzle --> API: pieces
+
+API -> Renderer: render_clean()
+
+activate Renderer
+Renderer -> Renderer: _render_shadow()
+Renderer -> Renderer: _render_pieces()
+deactivate Renderer
+
+Renderer --> API: clean_image
+
+API -> Renderer: render_solution()
+Renderer --> API: solution_img
+
+API -> Camera: apply_camera_sim()
+
+activate Camera
+Camera -> Camera: barrel_distortion()
+Camera -> Camera: perspective()
+Camera -> Camera: chromatic_aberration()
+deactivate Camera
+
+Camera --> API: noisy_image
+
+API --> Flask: result
+
+Flask --> User: JSON response\n{noisy_image,\nsolution_image,\nmetadata}
+
+@enduml
+....
+
 
 ==== Wichtige Schritte
 
@@ -118,108 +94,73 @@ User                Flask           api.py          geometry/       rendering/  
 
 ==== Motivation
 
-Ein Entwickler lädt ein vom Generator erzeugtes Puzzle-Bild hoch und möchte die automatische Lösung testen.
+Ein Entwickler lädt ein vom Generator erzeugtes Puzzle-Bild und möchte die automatische Lösung testen.
 
 ==== Ablauf
 
-[source]
-----
-User          Flask        preprocessing/  piece_extraction/  edge_detection/  edge_matching/  solver/
- │            routes.py    global_cleaner  extractor.py       edge_detector    edge_matcher    solver.py
- │             │           │               │                  │                │               │
- │ POST /upload│           │               │                  │                │               │
- ├────────────>│           │               │                  │                │               │
- │             │ save img  │               │                  │                │               │
- │             │           │               │                  │                │               │
- │ GET /extract│           │               │                  │                │               │
- ├────────────>│           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │             │ clean()   │               │                  │                │               │
- │             ├──────────>│               │                  │                │               │
- │             │           │ undistort()   │                  │                │               │
- │             │           ├──────┐        │                  │                │               │
- │             │           │      │        │                  │                │               │
- │             │           │<─────┘        │                  │                │               │
- │             │           │               │                  │                │               │
- │             │ cleaned   │               │                  │                │               │
- │             │<──────────┤               │                  │                │               │
- │             │           │               │                  │                │               │
- │             │ segment_pieces()          │                  │                │               │
- │             ├───────────┼──────────────>│                  │                │               │
- │             │           │               │ findContours()   │                │               │
- │             │           │               ├──────────┐       │                │               │
- │             │           │               │          │       │                │               │
- │             │           │               │<─────────┘       │                │               │
- │             │           │               │                  │                │               │
- │             │ pieces    │               │                  │                │               │
- │             │<──────────┼───────────────┤                  │                │               │
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │ JSON resp.  │           │               │                  │                │               │
- │<────────────┤           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │ GET /detect-edges       │               │                  │                │               │
- ├────────────>│           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │             │ detect_edges()            │                  │                │               │
- │             ├───────────┼───────────────┼─────────────────>│                │               │
- │             │           │               │                  │ snap corners   │               │
- │             │           │               │                  │ extract edges  │               │
- │             │           │               │                  │ classify       │               │
- │             │           │               │                  │ (flat/tab/slot)│               │
- │             │           │               │                  ├──────────┐     │               │
- │             │           │               │                  │          │     │               │
- │             │           │               │                  │<─────────┘     │               │
- │             │           │               │                  │                │               │
- │             │ edges     │               │                  │                │               │
- │             │<──────────┼───────────────┼──────────────────┤                │               │
- │             │           │               │                  │                │               │
- │ JSON resp.  │           │               │                  │                │               │
- │<────────────┤           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │ GET /solve-puzzle       │               │                  │                │               │
- ├────────────>│           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │               │
- │             │ find_matches()            │                  │                │               │
- │             ├───────────┼───────────────┼──────────────────┼───────────────>│               │
- │             │           │               │                  │                │ correlation   │
- │             │           │               │                  │                │ class compatibility
- │             │           │               │                  │                │ find unique matches
- │             │           │               │                  │                ├──────────┐    │
- │             │           │               │                  │                │          │    │
- │             │           │               │                  │                │<─────────┘    │
- │             │           │               │                  │                │               │
- │             │ matches   │               │                  │                │               │
- │             │<──────────┼───────────────┼──────────────────┼────────────────┤               │
- │             │           │               │                  │                │               │
- │             │ solve()   │               │                  │                │               │
- │             ├───────────┼───────────────┼──────────────────┼────────────────┼──────────────>│
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │ identify_corners()
- │             │           │               │                  │                │ (piece with 2 flat edges)
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │ try_each_corner()
- │             │           │               │                  │                │ as top-left
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │ greedy_expand()
- │             │           │               │                  │                │ via matches   │
- │             │           │               │                  │                │               │
- │             │           │               │                  │                │ calculate_rotations()
- │             │           │               │                  │                ├──────────┐    │
- │             │           │               │                  │                │          │    │
- │             │           │               │                  │                │<─────────┘    │
- │             │           │               │                  │                │               │
- │             │ solution  │               │                  │                │               │
- │             │<──────────┼───────────────┼──────────────────┼────────────────┼───────────────┤
- │             │           │               │                  │                │               │
- │ JSON resp.  │           │               │                  │                │               │
- │<────────────┤           │               │                  │                │               │
- │ { grid_layout,          │               │                  │                │               │
- │  placed_pieces,         │               │                  │                │               │
- │  confidence score }     │               │                  │                │               │
-----
+[plantuml, format=svg]
+....
+@startuml
+
+participant User
+participant "Flask\nroutes.py" as Flask
+participant "preprocessing/\nglobal_cleaner" as Preproc
+participant "piece_extraction/\nextractor.py" as Extractor
+participant "edge_detection/\nedge_detector" as EdgeDet
+participant "edge_matching/\nedge_matcher" as EdgeMatch
+participant "solver/\nsolver.py" as Solver
+
+User -> Flask: POST /upload
+Flask -> Flask: save img
+
+User -> Flask: GET /extract
+
+Flask -> Preproc: clean()
+activate Preproc
+Preproc -> Preproc: undistort()
+deactivate Preproc
+Preproc --> Flask: cleaned
+
+Flask -> Extractor: segment_pieces()
+activate Extractor
+Extractor -> Extractor: findContours()
+deactivate Extractor
+Extractor --> Flask: pieces
+
+Flask --> User: JSON resp.
+
+User -> Flask: GET /detect-edges
+
+Flask -> EdgeDet: detect_edges()
+activate EdgeDet
+EdgeDet -> EdgeDet: snap corners\nextract edges\nclassify\n(flat/tab/slot)
+deactivate EdgeDet
+EdgeDet --> Flask: edges
+
+Flask --> User: JSON resp.
+
+User -> Flask: GET /solve-puzzle
+
+Flask -> EdgeMatch: find_matches()
+activate EdgeMatch
+EdgeMatch -> EdgeMatch: correlation\nclass compatibility\nfind unique matches
+deactivate EdgeMatch
+EdgeMatch --> Flask: matches
+
+Flask -> Solver: solve()
+activate Solver
+Solver -> Solver: identify_corners()\n(piece with 2 flat edges)
+Solver -> Solver: try_each_corner()\nas top-left
+Solver -> Solver: greedy_expand()\nvia matches
+Solver -> Solver: calculate_rotations()
+deactivate Solver
+Solver --> Flask: solution
+
+Flask --> User: JSON resp.\n{ grid_layout,\nplaced_pieces,\nconfidence score }
+
+@enduml
+....
+
 
 ==== Wichtige Schritte
 

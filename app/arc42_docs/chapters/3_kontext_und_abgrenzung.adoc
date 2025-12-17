@@ -11,14 +11,14 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | **Entwickler**
 | REST-API (`/generate`, `/solve-puzzle`, `/calibrate`) +
-Steuert Generator und Solver über HTTP-Requests
-
-| **Physischer Puzzle-Roboter** +
-(zukünftig)
-| Übernimmt Solver-Algorithmen und wendet sie auf reale Kamera-Bilder an
+Steuert Generator und Solver über HTTP-Requests und GUI-Eingaben
 
 | **Puzzle Generator**
 | Erzeugt synthetische Puzzle-Bilder (4608×2592 px) mit simulierten Kamera-Imperfektionen für realitätsnahe Tests der Lösung des Puzzles
+
+| **Physischer Puzzle-Roboter** +
+(zukünftig)
+| Übernimmt Solver-Algorithmen, wendet sie auf reale Kamera-Bilder an und berechnet Lage sowie Versatz. Diese Daten werden an die Steuerung der Motoren und des Greifers übergeben.
 
 |===
 
@@ -90,7 +90,7 @@ RobotCtrl --> Hardware : Bewegungsanweisungen:\n- Greife Teil A\n- Rotiere um B�
 | Zeigt jeden Pipeline-Schritt (Segmentierung → Edge Detection → Matching → Solving) visuell
 
 | **Reproduzierbares Test-System**
-| Seed-basierte Generierung garantiert identische Puzzles für A/B-Tests
+| Seed-basierte Generierung garantiert identische Puzzles
 
 |===
 

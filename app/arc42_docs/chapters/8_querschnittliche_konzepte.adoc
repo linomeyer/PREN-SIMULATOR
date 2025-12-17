@@ -11,7 +11,7 @@ Dieses Kapitel beschreibt übergreifende Konzepte und Lösungsansätze, die in m
 
 ==== Konzept
 
-Sofern sinnvoll werden alle Parameter über **typsichere Python Dataclasses** verwaltet keine Plain Dicts oder Magic Strings.
+Sofern sinnvoll werden alle Parameter über **Python Dataclasses** verwaltet keine und Dictionaries verwendet.
 
 ==== Implementierung
 
@@ -21,7 +21,7 @@ Sofern sinnvoll werden alle Parameter über **typsichere Python Dataclasses** ve
 
 | **Generator**
 | `GeneratorConfig`, `PuzzleConfig`, `RenderConfig`, `CameraConfig`, `OutputConfig`
-| Typsichere Parameter für Geometrie, Rendering, Kamera-Effekte
+| Parameter für Geometrie, Rendering, Kamera-Effekte
 
 | **Solver**
 | Parameter als Query-Strings (`min_score`, `blur_kernel`)
@@ -31,7 +31,7 @@ Sofern sinnvoll werden alle Parameter über **typsichere Python Dataclasses** ve
 ==== Vorteile
 
 * **IDE-Support**: Autocomplete, Type Checking
-* **Validation**: Fehler zur Compile-Zeit statt Runtime
+* **Validation**: Fehler vor/beim Import statt während der Ausführung
 * **Dokumentation**: Types sind Self-Documenting
 
 === Fehlerbehandlung
@@ -88,7 +88,7 @@ Einheitliche JSON-Error-Responses auf allen REST-Endpunkten.
 | Stufe | Output-Dateien
 
 | **Segmentation**
-| `pieces_<filename>_<id>.png` (RGBA mit transparentem Background)
+| `pieces_<filename>_<id>.png` (RGBA mit transparentem Hintergrund)
 
 | **Edge Detection**
 | `edges_<filename>_<id>.png` (Konturen + Ecken + Labels)
@@ -117,7 +117,4 @@ if seed is not None:
     np.random.seed(seed)
 ----
 
-**Vorteile**:
-
-* Exakte Reproduzierbarkeit von Test-Puzzles
-* Ermöglicht A/B Testing verschiedener Algorithmen
+**Vorteil**: Exakte Reproduzierbarkeit von Test-Puzzles

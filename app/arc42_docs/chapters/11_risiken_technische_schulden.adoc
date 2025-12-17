@@ -46,7 +46,7 @@ Solver nur mit generierten Bildern getestet
 
 |===
 
-=== Mögliche Maßnahmen
+=== Mögliche Massnahmen
 
 1. **Erweitern der Edge Detection** +
    → Implementierung einer form-agnostischen Eckenermittlung (z.B. Douglas-Peucker Simplification)

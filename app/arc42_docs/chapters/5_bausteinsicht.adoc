@@ -94,53 +94,80 @@ package "PREN Puzzle Simulator" {
 
 ==== Übersichtsdiagramm
 
-[source]
-----
-┌─────────────────────────────────────────────────────────────────┐
-│                    Puzzle Generator Subsystem                    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                    ┌─────────┴──────────┐
-                    ▼                    ▼
-         ┌──────────────────┐   ┌──────────────────┐
-         │  routes.py       │   │  api.py          │
-         │                  │   │                  │
-         │  POST /generate  │──▶│  generate_       │
-         │  POST /calibrate │   │  puzzle_images() │
-         │  GET  /health    │   │                  │
-         └──────────────────┘   └──────────────────┘
-                                        │
-              ┌─────────────────────────┼─────────────────────┐
-              ▼                         ▼                     ▼
-    ┌─────────────────┐      ┌─────────────────┐   ┌─────────────────┐
-    │  geometry/      │      │  rendering/     │   │  simulation/    │
-    ├─────────────────┤      ├─────────────────┤   ├─────────────────┤
-    │                 │      │                 │   │                 │
-    │  puzzle.py      │      │  renderer.py    │   │  camera.py      │
-    │  • Generator    │─────▶│  • Renderer     │◀──│                 │
-    │  • PuzzlePiece  │      │  • Shadow       │   │                 │
-    │  • PieceEdge    │      │                 │   │  effects/       │
-    │                 │      │                 │   │  • 11 Types     │
-    │  cuts.py        │      │                 │   │                 │
-    │  • Cut (ABC)    │      │                 │   │                 │
-    │  • 13 Impls     │      │                 │   │                 │
-    └─────────────────┘      └─────────────────┘   └─────────────────┘
-              │                                              │
-              ▼                                              ▼
-    ┌─────────────────┐                           ┌─────────────────┐
-    │  config.py      │                           │  calibration/   │
-    ├─────────────────┤                           ├─────────────────┤
-    │                 │                           │                 │
-    │  • Generator    │                           │  grid_          │
-    │    Config       │                           │  calibrator.py  │
-    │  • Puzzle       │                           │                 │
-    │    Config       │                           │                 │
-    │  • Camera       │                           │                 │
-    │    Config       │                           │                 │
-    │  • Output       │                           │                 │
-    │    Config       │                           │                 │
-    └─────────────────┘                           └─────────────────┘
-----
+[plantuml, format=svg]
+....
+@startuml
+!define RECTANGLE class
+
+package "Puzzle Generator Subsystem" {
+
+  [routes.py] as Routes
+  note right of Routes
+    POST /generate
+    POST /calibrate
+    GET /health
+  end note
+
+  [api.py] as API
+  note right of API
+    generate_puzzle_images()
+  end note
+
+  package "geometry/" {
+    [puzzle.py] as Puzzle
+    note right of Puzzle
+      • Generator
+      • PuzzlePiece
+      • PieceEdge
+    end note
+
+    [cuts.py] as Cuts
+    note right of Cuts
+      • Cut (ABC)
+      • 13 Impls
+    end note
+  }
+
+  package "rendering/" {
+    [renderer.py] as Renderer
+  }
+
+  package "simulation/" {
+    [camera.py] as Camera
+
+    package "effects/" {
+      [11 Types] as Effects
+    }
+  }
+
+  [config.py] as Config
+  note left of Config
+    • GeneratorConfig
+    • PuzzleConfig
+    • CameraConfig
+    • OutputConfig
+  end note
+
+  package "calibration/" {
+    [grid_calibrator.py] as GridCalib
+  }
+
+  Routes --> API
+  API --> Puzzle
+  API --> Renderer
+  API --> Camera
+
+  Puzzle --> Renderer
+  Camera --> Renderer
+
+  Puzzle --> Cuts
+  Camera --> Effects
+  Puzzle --> Config
+  Camera --> GridCalib
+}
+
+@enduml
+....
 
 ==== Enthaltene Bausteine
 
@@ -161,7 +188,7 @@ package "PREN Puzzle Simulator" {
 | Bild-Rendering, Schatten
 
 | **simulation/**
-| Kamera-Effekt-Pipeline (11 Effects)
+| Kamera-Effekt-Pipeline
 
 | **calibration/**
 | Barrel Distortion Kalibrierung
@@ -175,60 +202,82 @@ package "PREN Puzzle Simulator" {
 === Puzzle Solver (Ebene 2)
 
 ==== Übersichtsdiagramm
+[plantuml, format=svg]
+....
+@startuml
+!define RECTANGLE class
 
-[source]
-----
-┌─────────────────────────────────────────────────────────────────┐
-│                    Puzzle Solver Subsystem                       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ┴──────────┐
-                                         ▼
-                                ┌──────────────────┐
-                                │  routes.py       │
-                                │                  │
-                                │  POST /upload    │
-                                │  GET  /extract   │
-                                │  GET  /detect-   │
-                                │       edges      │
-                                │  GET  /solve-    │
-                                │       puzzle     │
-                                └──────────────────┘
-                                        │
-       ┌────────────────────────────────┼─────────────────────────┐
-       ▼                                ▼                         ▼
-┌──────────────┐              ┌──────────────────┐     ┌──────────────────┐
-│preprocessing/│              │piece_extraction/ │     │edge_detection/   │
-├──────────────┤              ├──────────────────┤     ├──────────────────┤
-│              │              │                  │     │                  │
-│global_       │              │extractor.py      │     │edge_detector.py  │
-│cleaner.py    │─────────────▶│• PieceSegmenter │─────▶│• EdgeDetector    │
-│              │              │• PuzzlePiece     │     │• PieceEdge       │
-│image_clean.py│              │                  │     │                  │
-│              │              │extractor_        │     │edge_detector_    │
-│              │              │visualizer.py     │     │visualizer.py     │
-│              │              │• PieceVisualizer │     │• EdgeVisualizer  │
-│              │              │                  │     │                  │
-│              │              │                  │     │                  │
-└──────────────┘              └──────────────────┘     └──────────────────┘
-                                                                 │
-                              ┌──────────────────────────────────┤
-                              ▼                                  ▼
-                    ┌──────────────────┐              ┌──────────────────┐
-                    │edge_matching/    │              │solver/           │
-                    ├──────────────────┤              ├──────────────────┤
-                    │                  │              │                  │
-                    │edge_matcher.py   │──────────────▶│solver.py         │
-                    │• EdgeMatcher     │              │• PuzzleSolver    │
-                    │• EdgeMatch       │              │• PuzzleSolution  │
-                    │                  │              │• PlacedPiece     │
-                    │edge_matcher_     │              │                  │
-                    │visualizer.py     │              │solver_           │
-                    │• MatchVisualizer │              │visualizer.py     │
-                    │                  │              │• Solution        │
-                    │                  │              │  Visualizer      │
-                    └──────────────────┘              └──────────────────┘
-----
+package "Puzzle Solver Subsystem" {
+
+  [routes.py] as Routes
+  note right of Routes
+    POST /upload
+    GET /extract
+    GET /detect-edges
+    GET /solve-puzzle
+  end note
+
+  package "preprocessing/" {
+    [global_cleaner.py] as GlobalClean
+    [image_clean.py] as ImageClean
+  }
+
+  package "piece_extraction/" {
+    [extractor.py] as Extractor
+    note right of Extractor
+      • PieceSegmenter
+      • PuzzlePiece
+    end note
+
+    [extractor_visualizer.py] as ExtractorVis
+  }
+
+  package "edge_detection/" {
+    [edge_detector.py] as EdgeDetector
+    note right of EdgeDetector
+      • EdgeDetector
+      • PieceEdge
+    end note
+
+    [edge_detector_visualizer.py] as EdgeDetectorVis
+  }
+
+  package "edge_matching/" {
+    [edge_matcher.py] as EdgeMatcher
+    note right of EdgeMatcher
+      • EdgeMatcher
+      • EdgeMatch
+    end note
+
+    [edge_matcher_visualizer.py] as MatcherVis
+  }
+
+  package "solver/" {
+    [solver.py] as Solver
+    note right of Solver
+      • PuzzleSolver
+      • PuzzleSolution
+      • PlacedPiece
+    end note
+
+    [solver_visualizer.py] as SolverVis
+  }
+
+  Routes --> GlobalClean
+  GlobalClean --> ImageClean
+  ImageClean --> Extractor
+  Extractor --> EdgeDetector
+  EdgeDetector --> EdgeMatcher
+  EdgeMatcher --> Solver
+
+  Extractor --> ExtractorVis
+  EdgeDetector --> EdgeDetectorVis
+  EdgeDetector --> Solver
+  EdgeMatcher --> MatcherVis
+  Solver --> SolverVis
+}
+@enduml
+....
 
 ==== Enthaltene Bausteine
 

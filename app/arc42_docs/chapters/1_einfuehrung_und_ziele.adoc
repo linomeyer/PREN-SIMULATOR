@@ -5,7 +5,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Aufgabenstellung
 
-Das Projekt "Puzzle-Roboter-Simulator" entsteht im Rahmen eines Wettbewerbs, bei dem ein physischer Puzzle-Roboter per Knopfdruck ein Puzzle mit 6 Puzzle-Teilen lösen muss. Der **Simulator** dient der Entwicklung und dem Test der Software-Komponenten in einer kontrollierten, realitätsnahen Umgebung, bevor diese auf die physische Hardware übertragen werden.
+Das Projekt "Puzzle-Roboter-Simulator" entsteht im Rahmen eines Wettbewerbs, bei dem ein physischer Puzzle-Roboter per Knopfdruck ein Puzzle lösen muss. Der **Simulator** dient der Entwicklung und dem Test der Software-Komponenten in einer kontrollierten, realitätsnahen Umgebung, bevor diese auf die physische Hardware übertragen werden.
 
 Der Simulator umfasst zwei Hauptkomponenten:
 

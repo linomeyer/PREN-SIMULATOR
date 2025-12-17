@@ -31,7 +31,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |===
 | Randbedingung | Erläuterung
 
-| **Exakte Anzahl Teilee**
+| **Exakte Anzahl Teile**
 | Das Puzzle besteht aus exakt 6 Teilen
 
 | **Alle Teile haben Randberührung**
@@ -39,12 +39,12 @@ ifndef::imagesdir[:imagesdir: ../images]
 keine "innenliegenden" Teile ohne Randkante
 
 | **Nur Rotation, kein Umdrehen**
-| Teile müssen nicht gespiegelt werden;
+| Teile müssen nicht "gespiegelt" werden;
 Rotation im Bereich 0–360° ausreichend
 
 | **Schwarze Teile**
 | Einheitliche Farbe für alle Teile;
-erleichtert Segmentierung durch Kontrast zum weißen Hintergrund
+erleichtert Segmentierung durch Kontrast zum weissen Hintergrund
 
 | **Toleranz zwischen Teilen**
 | Im gelösten Zustand: ~1mm Abstand zwischen Teilen
@@ -76,8 +76,8 @@ erleichtert Segmentierung durch Kontrast zum weißen Hintergrund
 | 6 Puzzle-Teile welche in gelöstem Zustand einen A5 grossen Rahmen füllen
 
 | **Knopfdruck-Start**
-| Physischer Roboter muss vollautomatisch arbeiten – Simulator simuliert diesen Prozess Ende-zu-Ende
+| Physischer Roboter muss vollautomatisch arbeiten – Simulator simuliert Teilprozesse davon
 
-| **Dokumentationspflicht**
+| **Dokumentations-pflicht**
 | arc42-Dokumentation als Teil der Projektabgabe
 |===

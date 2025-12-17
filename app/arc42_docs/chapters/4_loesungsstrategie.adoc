@@ -12,8 +12,8 @@ Die Gesamtlösung besteht aus **zwei unabhängigen, aber komplementären Subsyst
 | Subsystem | Hauptaufgabe | Technologischer Ansatz
 
 | **Puzzle Generator**
-| Erzeugt realistische Test-Puzzles mit Kamera-Simulation
-| Parametrische Geometrie + Physics-based Camera Effects
+| Erzeugt Test-Puzzles mit Kamera-Simulation
+| Parametrische Geometrie + physikbasierte Kamera Effekte
 
 | **Puzzle Solver**
 | Löst Puzzle-Bilder durch Computer Vision
@@ -33,18 +33,18 @@ Die Gesamtlösung besteht aus **zwei unabhängigen, aber komplementären Subsyst
 
 | **Pasende Puzzle-Teile**
 | `ReversedCut` wrapper invertiert Punktreihenfolge (male/female)
-| Garantiert perfekte passende Puzzle-Teile
+| Garantiert passende Puzzle-Teile
 
 | **Piece Placement**
-| Grid-basiert mit Safe Zones (40% des radius)
-| Verhindert Überlappung trotz 0-360° Rotation
+| Grid-basiert mit Safe Zones
+| Verhindert Überlappung trotz Rotation
 
 | **Shadow Rendering**
-|
+| Nutzt skalierte Boundingboxes für die Performance
 | Simuliert realistische Bilder des finalen Roboters
 
 | **Camera Effects**
-|
+| Effekte basierend auf OpenCV und NumPy Bibliotheken
 | Simuliert tatsächliche Verzerrungen durch die Kamera-Aufnahme
 
 |===
@@ -57,14 +57,14 @@ Die Gesamtlösung besteht aus **zwei unabhängigen, aber komplementären Subsyst
 |===
 | Problem | Lösung | Begründung
 
-| **Bild-Verzerrung** +
+| **Bild-Entzerrung** +
 | OpenCV `undistort()` mit calibration_params.json
 | Muss VOR Segmentierung erfolgen, sonst sind Konturen gekrümmt
 
-| **Teile erkkennen** +
-(Schwarz auf weißem Grund)
+| **Teile erkennen** +
+(Schwarz auf weissem Grund)
 | Otsu-Verfahren um Puzzleteil zu erkennen
-| Robuster Algorithmus um Schwellenwerte zwischen Vordergrund und Hintergrund zu erkennen.
+| Robuster Algorithmus um Schwellwerte zwischen Vordergrund und Hintergrund zu definieren.
 
 | **Eck-Erkennung** +
 (Tabs/Slots verfälschen Ecken)
@@ -75,7 +75,7 @@ Die Gesamtlösung besteht aus **zwei unabhängigen, aber komplementären Subsyst
 | **Edge Matching** +
 (Passende Kanten finden)
 | Kurvenkorrelation + filter auf Tab-Slot matches
-| Tab-Slot filter verbessert Performance und Zuverlässigkeit
+| Tab-Slot filter verbessert Performance
 
 | **Puzzle-Rekonstruktion**
 | Start in Ecke + Greedy Algorithmus

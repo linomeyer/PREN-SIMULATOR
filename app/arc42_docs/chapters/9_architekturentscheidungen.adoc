@@ -9,7 +9,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 **Lösung**:
 - Generator erstellt Puzzles mit konfigurierbaren Parametern (Seed, Cut-Types, Kamera-Effekte)
-- Solver arbeitet ausschließlich mit Bildern
+- Solver arbeitet ausschliesslich mit Bildern
 
 
 === 2. Klassische Computer Vision statt Machine Learning
@@ -24,7 +24,7 @@ Bewusster Einsatz von CV-Algorithmen
 
 - **Interpretierbarkeit**: Jeder Schritt ist nachvollziehbar und debuggbar
 
-- **Keine Trainingsdaten**: Keine großen Puzzle-Datensätze verfügbar
+- **Keine Trainingsdaten**: Keine grossen Puzzle-Datensätze verfügbar
 
 - **Erfahrung**: Wenig Grundwissen und Erfahrung in diesem Bereich
 
