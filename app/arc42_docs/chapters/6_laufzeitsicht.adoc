@@ -16,6 +16,8 @@ Dieses Kapitel beschreibt die wichtigsten Ablaufszenarien des Systems zur Laufze
 
 Ein Entwickler möchte ein neues Test-Puzzle mit realistischen Kamera-Effekten generieren, um den Solver zu testen.
 
+<<<
+
 ==== Ablauf
 
 [plantuml, format=svg]
@@ -75,17 +77,17 @@ Flask --> User: JSON response\n{noisy_image,\nsolution_image,\nmetadata}
 
 ==== Wichtige Schritte
 
-* 1. Edge Cuts zuteilen
+1. Edge Cuts zuteilen
 
-* 2. Teile generieren
+2. Teile generieren
 
-* 3. Zufälliges platzieren
+3. Zufälliges platzieren
 
-* 4. Sauberes Rendering
+4. Sauberes Rendering
 
-* 5. Rendering der Lösung
+5. Rendering der Lösung
 
-* 6. Kamera Simulation
+6. Verzerrtes Rendering
 
 
 === Szenario 2: Puzzle-Lösung
@@ -162,9 +164,9 @@ Flask --> User: JSON resp.\n{ grid_layout,\nplaced_pieces,\nconfidence score }
 
 ==== Wichtige Schritte
 
-* 1. Global Cleaning
-* 2. Segmentierung
-* 3. Kantenerkennung
-* 4. Kanten-Matching
-* 5. Puzzle lösen
+1. Global Cleaning
+2. Segmentierung
+3. Kantenerkennung
+4. Kanten-Matching
+5. Puzzle lösen
 

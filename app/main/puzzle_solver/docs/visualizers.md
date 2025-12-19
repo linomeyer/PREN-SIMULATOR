@@ -11,7 +11,7 @@ Dateien im Paket:
 ## PieceVisualizer
 - Visualisiert jede erkannte Teilmaske als RGBA-Bild (transparenter Hintergrund).
 - Typische Dateinamen enthalten den Upload-Dateinamen und einen Suffix (z. B. `pieces_...png`).
-- Nutzen: schnelle Qualitätskontrolle der Segmentierung (Anzahl, Größe, Konturglätte).
+- Nutzen: schnelle Qualitätskontrolle der Segmentierung (Anzahl, Grösse, Konturglätte).
 
 ## EdgeVisualizer
 - Zeichnet pro Teil: Kontur, gesnappte Ecken, vier Kanten mit Richtung und Klassenfarbe (`flat/tab/slot`).
@@ -27,4 +27,4 @@ Dateien im Paket:
 - Nutzen: Beurteilung der Gesamtqualität und Plausibilität der Lösung.
 
 ## Ausgabepfad
-- Standardmäßig werden Bilder unter `app/static/output` abgelegt und können über die Route `/output/<path>` abgerufen werden.
+- Standardmässig werden Bilder unter `app/static/output` abgelegt und können über die Route `/output/<path>` abgerufen werden.

@@ -558,7 +558,7 @@ class PuzzleGenerationResult:
 2. **Male/Female Cut Pairing**: `ReversedCut` wrapper garantiert perfekte Passung durch Punktinvertierung
 3. **Shadow Optimization**: Rendering bei 0.5x scale + LANCZOS upscaling = 4x Speedup
 4. **Grid-based Placement**: Verhindert Piece-Overlap durch cell-based safe zones
-5. **Scale Factor**: Automatische Skalierung wenn Pieces größer als Canvas
+5. **Scale Factor**: Automatische Skalierung wenn Pieces grösser als Canvas
 6. **Calibration Grid**: Wird VOR Barrel Distortion gezeichnet, damit Verzerrung messbar ist
 7. **Effect Pipeline**: Realistische Reihenfolge simuliert echte Kamera-Verarbeitung
 8. **Watermark**: Enthält Seed + Layout für Reproduzierbarkeit

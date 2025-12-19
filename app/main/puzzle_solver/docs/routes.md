@@ -121,7 +121,7 @@ Antwort (vollständiges JSON‑Beispiel)
 ## GET `/clean-pieces/<filename>`
 Beschreibung
 - Führt lokale Nachbearbeitung der extrahierten Teile mittels `ImageCleaner` aus.
-- Erstellt außerdem einen Konturvergleich (rot: original, grün: bereinigt).
+- Erstellt ausserdem einen Konturvergleich (rot: original, grün: bereinigt).
 
 Antwort (vollständiges JSON‑Beispiel)
 ```

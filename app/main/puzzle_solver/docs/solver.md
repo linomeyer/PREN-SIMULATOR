@@ -12,7 +12,7 @@ Eingaben
 - `List[PuzzlePiece]` aus der Teile-Extraktion.
 
 Ausgaben
-- `PuzzleSolution` mit platzierten Teilen, Grid-Größe, Konfidenz und verwendeten Matches.
+- `PuzzleSolution` mit platzierten Teilen, Grid-Grösse, Konfidenz und verwendeten Matches.
 - Visualisierungen über `SolutionVisualizer`.
 
 ## Vorgehen (vereinfacht)

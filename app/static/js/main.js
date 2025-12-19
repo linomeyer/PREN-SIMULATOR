@@ -681,7 +681,7 @@ function displaySolutionResults(data) {
     let html = `
         <div class="info-box">
             <h4>Lösungs-Statistik</h4>
-            <p><strong>Gittergröße:</strong> ${solution.grid_rows} × ${solution.grid_cols}</p>
+            <p><strong>Gittergrösse:</strong> ${solution.grid_rows} × ${solution.grid_cols}</p>
             <p><strong>Platzierte Teile:</strong> ${solution.pieces_placed} / ${solution.total_pieces}</p>
             <p><strong>Vertrauen:</strong> ${(solution.confidence * 100).toFixed(1)}%</p>
             <p><strong>Verwendete Matches:</strong> ${solution.matches_used}</p>
@@ -755,7 +755,7 @@ function displaySolutionResults(data) {
                     <p style="margin-top: 15px; font-weight: bold; font-size: 1.1em;">
                         ${imgFilename.includes('assembled') ? 'Zusammengesetztes Puzzle' : 'Visualisierung'}
                     </p>
-                    <p style="color: #666; font-size: 0.95em;">Klicke zum Vergrößern</p>
+                    <p style="color: #666; font-size: 0.95em;">Klicke zum Vergrössern</p>
                 </div>
             `;
         }
@@ -974,7 +974,7 @@ function displayGlobalCleanResults(data) {
                 <div class="piece-info" style="text-align: center;">
                     <div><strong>Links:</strong> Original</div>
                     <div><strong>Rechts:</strong> Gesäubert</div>
-                    <div style="color: #666; font-size: 0.9em; margin-top: 5px;">Klicke zum Vergrößern</div>
+                    <div style="color: #666; font-size: 0.9em; margin-top: 5px;">Klicke zum Vergrössern</div>
                 </div>
             </div>
         `;
@@ -1019,7 +1019,7 @@ function displayPieceCleanResults(data) {
                 <div class="piece-info" style="text-align: center;">
                     <div><strong style="color: red;">Rot:</strong> Original-Konturen</div>
                     <div><strong style="color: green;">Grün:</strong> Gesäuberte Konturen</div>
-                    <div style="color: #666; font-size: 0.9em; margin-top: 5px;">Klicke zum Vergrößern</div>
+                    <div style="color: #666; font-size: 0.9em; margin-top: 5px;">Klicke zum Vergrössern</div>
                 </div>
             </div>
         `;

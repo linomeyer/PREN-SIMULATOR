@@ -22,9 +22,6 @@ ifdef::backend-html5[]
 ++++
 endif::backend-html5[]
 
-// horizontal line
-***
-
 // numbering from here on
 :numbered:
 

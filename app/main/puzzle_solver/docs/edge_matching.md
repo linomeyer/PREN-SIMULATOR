@@ -20,7 +20,7 @@ Ausgaben
 
 2. Zusammengesetzter Score pro Kandidatenpaar
    - Formähnlichkeit: Korrelation der krümmungsbasierten Formsignaturen; Vergleich ggf. gespiegelt, um Richtung zu berücksichtigen.
-   - Längenähnlichkeit: bestraft große Längendifferenzen (z. B. Verhältnis oder exponentielle Abnahme).
+   - Längenähnlichkeit: bestraft grosse Längendifferenzen (z. B. Verhältnis oder exponentielle Abnahme).
    - Klassenkompatibilität: belohnt erwartete Komplementarität (tab/slot) bzw. Gleichheit bei `flat`.
 
 3. Eindeutige beste Treffer

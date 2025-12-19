@@ -1,6 +1,6 @@
 # Vorverarbeitung
 
-Dieses Kapitel beschreibt die optionalen globalen und lokalen Reinigungsschritte, die die Segmentierung und die anschließende Kantenauswertung verbessern.
+Dieses Kapitel beschreibt die optionalen globalen und lokalen Reinigungsschritte, die die Segmentierung und die anschliessende Kantenauswertung verbessern.
 
 Dateien im Paket:
 - preprocessing/global_cleaner.py
@@ -17,7 +17,7 @@ Funktionen
 - Chromatische Aberration (optional): korrigiert Kanalversatz, um Kanten zu schärfen.
 
 Warum hier eingesetzt
-- Gleichmäßigere Geometrie und Beleuchtung verbessern Thresholding, Konturqualität sowie Eck-/Kantenerkennung. Verzerrungen können gerade Ränder krümmen und die Klassifikation „flat/tab/slot“ verfälschen.
+- Gleichmässigere Geometrie und Beleuchtung verbessern Thresholding, Konturqualität sowie Eck-/Kantenerkennung. Verzerrungen können gerade Ränder krümmen und die Klassifikation „flat/tab/slot“ verfälschen.
 
 Wichtige API
 - calibrate(test_images): bestimmt Parameter aus Testbildern und speichert den Zustand.
@@ -38,10 +38,10 @@ Zweck
 
 Funktionen
 - Leichte Entrauschung des Teil-Bildausschnitts.
-- Morphologische Verfeinerungen an der Maske (z. B. Schließen kleiner Löcher, Entfernen von Sprenkeln).
+- Morphologische Verfeinerungen an der Maske (z. B. Schliessen kleiner Löcher, Entfernen von Sprenkeln).
 
 Warum hier eingesetzt
-- Sauberere Konturen verbessern Eckenerkennung und die Krümmungssignatur der Kanten. Außerdem werden Visualisierungen klarer.
+- Sauberere Konturen verbessern Eckenerkennung und die Krümmungssignatur der Kanten. Ausserdem werden Visualisierungen klarer.
 
 Ein-/Ausgaben
 - Input: Liste von PuzzlePiece-Objekten.

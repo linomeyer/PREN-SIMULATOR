@@ -92,6 +92,8 @@ package "PREN Puzzle Simulator" {
 | Typsichere Parameter-Objekte (GeneratorConfig, PuzzleConfig, etc.)
 |===
 
+<<<
+
 === Puzzle Generator (Ebene 2)
 
 ==== Übersichtsdiagramm
@@ -200,6 +202,8 @@ package "Puzzle Generator Subsystem" {
 
 
 |===
+
+<<<
 
 === Puzzle Solver (Ebene 2)
 

@@ -29,10 +29,10 @@ Dateien im Paket:
    - Warum: Stellt sicher, dass jede Kante dem nächstliegenden Kontursegment entspricht und nicht dem langen Weg.
 
 3. Merkmalsberechnung auf `PieceEdge`
-   - Länge: `cv2.arcLength(points, False)`; dient Größen-/Kompatibilitätsvergleich.
+   - Länge: `cv2.arcLength(points, False)`; dient Grössen-/Kompatibilitätsvergleich.
    - Winkel: PCA auf Kantenpunkten für robuste Orientierungsbaseline; Normalisierung auf [0°, 360°]. Richtung entspricht `start_point → end_point`.
      - Warum PCA: stabiler als reine Endpunkt-Steilheit bei gekrümmten Verläufen; weniger rauschanfällig.
-   - Formsignatur (krümmungsbasiert): gleichmäßige Abtastung (Standard 50), Winkeldifferenzen zwischen Segmenten berechnen, auf [-π, π] normieren.
+   - Formsignatur (krümmungsbasiert): gleichmässige Abtastung (Standard 50), Winkeldifferenzen zwischen Segmenten berechnen, auf [-π, π] normieren.
      - Warum: erfasst das Muster aus Auswölbung/Einbuchtung unabhängig von Position/Rotation.
 
 4. Kantenklassifikation: flat vs tab vs slot

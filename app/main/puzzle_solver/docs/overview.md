@@ -25,7 +25,7 @@ Hinweis: Alle hier beschriebenen Implementierungen liegen im Paket `puzzle_solve
 Artefakte jedes Schritts werden von dedizierten Visualizer-Klassen erzeugt und unter `app/static/output` gespeichert (bei Aufruf über die Routen).
 
 ## Umfang
-Der Fokus liegt ausschließlich auf dem Paket `puzzle_solver`. Die Routen werden als Überblick dargestellt, Details verbleiben im Paket.
+Der Fokus liegt ausschliesslich auf dem Paket `puzzle_solver`. Die Routen werden als Überblick dargestellt, Details verbleiben im Paket.
 
 ## Grobes Klassendiagramm (Pakete und Dateien)
 

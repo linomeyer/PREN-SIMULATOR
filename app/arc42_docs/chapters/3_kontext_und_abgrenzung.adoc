@@ -50,6 +50,8 @@ Solver --> Entwickler : Gelöstes Puzzle
 @enduml
 ....
 
+<<<
+
 === Technischer Kontext (phyisischer Roboter - zukünftig)
 
 [plantuml, format=svg]
