@@ -179,6 +179,15 @@ class MatchingConfig:
     penalty_missing_frame_contact: float = 10.0
     """Penalty if a piece has no acceptable frame hypothesis. TODO: Tuning"""
 
+    frame_coverage_vs_inlier_policy: str = "balanced"
+    """
+    Coverage vs Inlier metric policy.
+    - "coverage": Prefer coverage_in_band metric
+    - "inlier": Prefer inlier_ratio metric
+    - "balanced": Weight both equally (default)
+    TODO: Tuning based on empirical data
+    """
+
     # ========== 2. Segmentation ==========
     target_seg_count_range: tuple[int, int] = (4, 12)
     """Target range for number of segments per piece"""
@@ -226,6 +235,7 @@ class MatchingConfig:
     """
     Strategy for non-convex polygon overlap (Option B: triangulation).
     Performance critical! See docs/implementation/00_structure.md §3 Step 7.
+    Limits: Max 50 triangles per piece (guard against explosion).
     """
 
     nonconvex_aggregation: str = "max"
@@ -251,6 +261,13 @@ class MatchingConfig:
 
     many_to_one_max_chain_len: int = 2
     """Maximum chain length for composite segments (2 or 3)"""
+
+    penalty_composite_used: float = 5.0
+    """
+    Penalty for using composite segments in many-to-one matching.
+    Small penalty to avoid unnecessary many-to-one (prefer direct 1:1).
+    TODO: Tuning
+    """
 
     # ========== 8. Debug ==========
     debug_topN_frame_hypotheses_per_piece: int = 5

@@ -49,12 +49,17 @@
 
 ---
 
-### 2. solver/models.py (7 Datenmodelle, 234 Zeilen)
+### 2. solver/models.py (8 Datenmodelle, ~260 Zeilen)
 
 #### Pose2D
 - **Zweck**: 2D-Pose (Position + Orientierung)
 - **Felder**: x_mm, y_mm, theta_deg
 - **Dokumentation**: Koordinatensystem muss im Kontext getaggt sein
+
+#### PuzzlePiece
+- **Zweck**: Input-Modell für extrahierte Puzzle-Teile
+- **Felder**: piece_id, contour_mm, mask, bbox_mm, image (optional), center_mm (optional)
+- **Dokumentation**: Schnittstelle zu piece_extraction Modul, Koordinatensystem M
 
 #### ContourSegment
 - **Zweck**: Segmentiertes Konturstück
@@ -212,7 +217,22 @@ def solve_puzzle(pieces, frame, config):
 
 ## Abweichungen vom Design
 
-**Keine**. Implementierung folgt exakt docs/implementation/00_structure.md §6.1, §2.
+**Ergänzungen nach Design-Review (2025-12-23)**:
+1. **PuzzlePiece Klasse hinzugefügt** (fehlte in initial spec)
+   - Input-Modell für Pieces mit contour_mm, mask, bbox_mm
+   - Definiert Schnittstelle zu piece_extraction Modul
+2. **ContourSegment.chord spezifiziert** (tuple structure präzisiert)
+   - `(start_pt, end_pt)` statt `(a_mm, b_mm)` für Klarheit
+3. **Segment-Orientierung dokumentiert**
+   - Chord direction (end - start)
+   - Profile orientation (perpendicular right-hand)
+   - reversal_used Semantik erklärt
+4. **Config Policy-Flags ergänzt**:
+   - `frame_coverage_vs_inlier_policy: "balanced"` (coverage vs inlier preference)
+   - `penalty_composite_used: 5.0` (many-to-one penalty)
+   - `polygon_nonconvex_strategy`: Triangle limit (max 50) dokumentiert
+
+**Ansonsten**: 100% gemäss docs/implementation/00_structure.md §6.1, §2
 
 ---
 
@@ -267,12 +287,14 @@ except NotImplementedError as e:
 
 ## Statistik
 
-| Datei         | Zeilen | Klassen | Funktionen | Felder (gesamt) |
-|---------------|--------|---------|------------|-----------------|
-| config.py     | 245    | 3       | 5 (stubs)  | 23              |
-| models.py     | 234    | 7 (+1 Enum) | 0      | 38              |
-| __init__.py   | 105    | 0       | 1 (stub)   | -               |
-| **Gesamt**    | **584**| **10**  | **6**      | **61**          |
+| Datei         | Zeilen | Klassen     | Funktionen | Felder (gesamt) |
+|---------------|--------|-------------|------------|-----------------|
+| config.py     | ~260   | 3           | 5 (stubs)  | 26              |
+| models.py     | ~260   | 8 (+1 Enum) | 0          | 44              |
+| __init__.py   | ~105   | 0           | 1 (stub)   | -               |
+| **Gesamt**    | **~625**| **11**     | **6**      | **70**          |
+
+**Nach Design-Review**: +1 Klasse (PuzzlePiece), +3 Config-Felder, +6 Model-Felder
 
 ---
 

@@ -16,6 +16,7 @@ from typing import List
 from .config import MatchingConfig, FrameModel, Transform2D
 from .models import (
     Pose2D,
+    PuzzlePiece,
     ContourSegment,
     FrameContactFeatures,
     FrameHypothesis,
@@ -34,6 +35,7 @@ __all__ = [
     "Transform2D",
     # Models
     "Pose2D",
+    "PuzzlePiece",
     "ContourSegment",
     "FrameContactFeatures",
     "FrameHypothesis",
@@ -43,7 +45,7 @@ __all__ = [
 ]
 
 
-def solve_puzzle(pieces: List, frame: FrameModel, config: MatchingConfig) -> PuzzleSolution:
+def solve_puzzle(pieces: List[PuzzlePiece], frame: FrameModel, config: MatchingConfig) -> PuzzleSolution:
     """
     Solve puzzle using multi-hypothesis beam search.
 
@@ -51,10 +53,12 @@ def solve_puzzle(pieces: List, frame: FrameModel, config: MatchingConfig) -> Puz
     and attempts to find a consistent solution within the given frame.
 
     Args:
-        pieces: List of PuzzlePiece objects from piece_extraction module
+        pieces: List of PuzzlePiece objects (from solver.models.PuzzlePiece)
                 Each piece must have:
-                - contour: np.ndarray[(N,2)] contour points
-                - Additional fields (mask, bbox, image) optional
+                - contour_mm: np.ndarray[(N,2)] contour points in mm
+                - mask: binary mask
+                - bbox_mm: bounding box in mm
+                - Additional fields (image, center_mm) optional
         frame: FrameModel defining the A5 frame (128x190mm)
                - Includes optional T_MF transform if machine coordinates needed
         config: MatchingConfig with all solver parameters

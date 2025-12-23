@@ -44,6 +44,33 @@ class Pose2D:
 
 
 @dataclass
+class PuzzlePiece:
+    """
+    Input puzzle piece from extraction module.
+
+    Attributes:
+        piece_id: Unique piece identifier
+        contour_mm: Contour points in mm, shape (N, 2), coordinate system M
+        mask: Binary mask, shape (H, W)
+        bbox_mm: Bounding box in mm (x_min, y_min, x_max, y_max) in M
+        image: Optional texture image (RGBA)
+        center_mm: Optional center of mass in mm, shape (2,) in M
+
+    Notes:
+        - Input from piece_extraction module
+        - Coordinate system M (Machine) or intermediate extraction system
+        - Converted to Frame system (F) internally by solver
+        - See docs/implementation/00_structure.md §1.1 for integration
+    """
+    piece_id: int | str
+    contour_mm: np.ndarray  # (N, 2) in mm, KS M
+    mask: np.ndarray  # (H, W) binary
+    bbox_mm: tuple[float, float, float, float]  # (x_min, y_min, x_max, y_max) in M
+    image: Optional[np.ndarray] = None  # Texture (optional)
+    center_mm: Optional[np.ndarray] = None  # (2,) Schwerpunkt in M
+
+
+@dataclass
 class ContourSegment:
     """
     Segmented piece of a contour.
@@ -53,7 +80,7 @@ class ContourSegment:
         segment_id: Segment index within piece contour
         points_mm: Segment points in mm, shape (M, 2)
         length_mm: Arclength of segment in mm
-        chord: Tuple of start and end points (a_mm, b_mm), each shape (2,)
+        chord: Chord endpoints (start, end), each shape (2,) in mm
         direction_angle_deg: Chord direction angle in degrees [-180, 180)
         flatness_error: RMS point-to-chord distance in mm
         profile_1d: Optional 1D profile (lazy-loaded), shape (N,)
@@ -63,12 +90,15 @@ class ContourSegment:
         - Coordinate system depends on context (typically Frame F)
         - flatness_error: lower = straighter segment
         - profile_1d computed on demand in Step 5 (Inner Matching)
+        - Segment orientation: Normalized via chord direction (end - start)
+        - Profile orientation: Consistent with chord direction (perpendicular right-hand)
+        - reversal_used in InnerMatchCandidate indicates profile was flipped for matching
     """
     piece_id: int | str
     segment_id: int
     points_mm: np.ndarray  # (M, 2)
     length_mm: float
-    chord: tuple[np.ndarray, np.ndarray]  # (a_mm, b_mm), each (2,)
+    chord: tuple[np.ndarray, np.ndarray]  # (start_pt, end_pt), each (2,) in mm
     direction_angle_deg: float
     flatness_error: float
     profile_1d: Optional[np.ndarray] = None  # (N,), lazy
