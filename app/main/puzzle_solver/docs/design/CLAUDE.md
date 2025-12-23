@@ -153,7 +153,41 @@ Siehe `implementation/00_structure.md` für detaillierte Struktur und Abhängigk
 5. Aggregation-Kommentar: "max" empfohlen für Pruning, "mean/p90" nur für Diagnose
 6. A/B Test Assertion robuster: overlap_violations statt confidence
 
-**Nächster Schritt**: Schritt 1 - Fundament (Config + Models)
+**Nächster Schritt**: ~~Schritt 1 - Fundament (Config + Models)~~ ✅ Abgeschlossen → **Schritt 2 - Einheiten & KS**
+
+---
+
+## Implementierungs-Fortschritt
+
+### ✅ Schritt 1: Fundament (Config + Models) - ABGESCHLOSSEN
+
+**Datum**: 2025-12-23
+
+**Implementiert**:
+- `solver/config.py`: Transform2D, FrameModel, MatchingConfig (245 Zeilen)
+- `solver/models.py`: 7 Datenmodelle + SolutionStatus Enum (234 Zeilen)
+- `solver/__init__.py`: solve_puzzle() API-Gerüst (105 Zeilen)
+
+**Statistik**: 584 Zeilen, 10 Klassen, 61 Felder
+
+**Dokumentation**: `implementation/01_fundament_impl.md`
+
+**Design-Entscheidungen**:
+- dataclass für alle Modelle (clean, Type Hints)
+- Python 3.10+ Syntax (dict[K,V], X|Y)
+- Enum für SolutionStatus
+- tuple für seg_ref (einfach, hashable)
+- Transform2D Methoden als Stubs (Implementierung Schritt 2)
+
+**Offene Punkte für Schritt 2**:
+- Transform2D Methoden implementieren
+- utils/conversion.py (Pixel→mm)
+- KS-Tagging in Debug
+- T_MF Platzhalter
+
+---
+
+### 🔄 Schritt 2: Einheiten & KS - NÄCHSTER SCHRITT
 
 ---
 
