@@ -153,7 +153,7 @@ Siehe `implementation/00_structure.md` für detaillierte Struktur und Abhängigk
 5. Aggregation-Kommentar: "max" empfohlen für Pruning, "mean/p90" nur für Diagnose
 6. A/B Test Assertion robuster: overlap_violations statt confidence
 
-**Nächster Schritt**: ~~Schritt 1 - Fundament (Config + Models)~~ ✅ Abgeschlossen → **Schritt 2 - Einheiten & KS**
+**Nächster Schritt**: ~~Schritt 1~~ ✅ ~~Schritt 2~~ ✅ → **Schritt 3 - Segmentierung + Flatness**
 
 ---
 
@@ -179,15 +179,39 @@ Siehe `implementation/00_structure.md` für detaillierte Struktur und Abhängigk
 - tuple für seg_ref (einfach, hashable)
 - Transform2D Methoden als Stubs (Implementierung Schritt 2)
 
-**Offene Punkte für Schritt 2**:
-- Transform2D Methoden implementieren
-- utils/conversion.py (Pixel→mm)
-- KS-Tagging in Debug
-- T_MF Platzhalter
+---
+
+### ✅ Schritt 2: Einheiten & KS - ABGESCHLOSSEN
+
+**Datum**: 2025-12-23
+
+**Implementiert**:
+- `solver/config.py`: Transform2D Methoden (5 Methoden, +35 Zeilen)
+  - to_matrix(), from_matrix(), compose(), inverse(), apply()
+- `solver/utils/conversion.py`: Pixel→mm Konvertierung (160 Zeilen, 5 Funktionen)
+  - convert_points_px_to_mm(), convert_contour_px_to_mm(), convert_bbox_px_to_mm()
+  - Platzhalter: get_default_scale_simulator(), get_machine_origin_offset_placeholder()
+- `solver/utils/__init__.py`: API-Exports (17 Zeilen)
+- `solver/config.py`: FrameModel Docstring erweitert (+12 Zeilen)
+
+**Statistik**: +224 Zeilen, 10 Funktionen (5 Transform2D + 5 Conversion)
+
+**Dokumentation**: `implementation/02_einheiten_impl.md`
+
+**Design-Entscheidungen**:
+- Homogene Koordinaten für Transformationen (Standard-Ansatz)
+- np.linalg.inv für inverse() (Klarheit > Mikrooptimierung)
+- Separate Konvertierungsfunktionen (Typsicherheit)
+- Platzhalter-Funktionen für unbekannte Parameter (bewusst offen)
+
+**Offene Punkte für spätere Schritte**:
+- Kalibrierung (scale, offset, T_MF) in Schritt 10
+- KS-Tagging in Debug (Schritt 9)
+- Corner Radius Messung (nach Rahmenbau)
 
 ---
 
-### 🔄 Schritt 2: Einheiten & KS - NÄCHSTER SCHRITT
+### 🔄 Schritt 3: Segmentierung + Flatness - NÄCHSTER SCHRITT
 
 ---
 

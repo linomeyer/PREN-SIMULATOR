@@ -39,14 +39,24 @@ class Transform2D:
         Convert to 3x3 homogeneous transformation matrix.
 
         Returns:
-            3x3 numpy array: [[cos -sin tx]
-                              [sin  cos ty]
-                              [0    0   1 ]]
+            3x3 numpy array: [[cos(θ) -sin(θ) tx]
+                              [sin(θ)  cos(θ) ty]
+                              [0       0      1 ]]
 
         Notes:
-            TODO: Implement in Step 2 (Einheiten & KS)
+            - Rotation around origin, then translation
+            - Angle in degrees, converted to radians internally
+            - Standard 2D transformation matrix (rotation + translation)
         """
-        raise NotImplementedError("Transform2D.to_matrix() - Step 2")
+        theta_rad = np.deg2rad(self.theta_deg)
+        c = np.cos(theta_rad)
+        s = np.sin(theta_rad)
+
+        return np.array([
+            [c, -s, self.x_mm],
+            [s,  c, self.y_mm],
+            [0,  0, 1]
+        ], dtype=float)
 
     @classmethod
     def from_matrix(cls, mat: np.ndarray) -> Transform2D:
@@ -60,9 +70,17 @@ class Transform2D:
             Transform2D instance
 
         Notes:
-            TODO: Implement in Step 2
+            - Extracts translation from mat[:2, 2]
+            - Extracts rotation via arctan2(mat[1,0], mat[0,0])
+            - Angle normalized to [-180, 180) degrees
         """
-        raise NotImplementedError("Transform2D.from_matrix() - Step 2")
+        x_mm = float(mat[0, 2])
+        y_mm = float(mat[1, 2])
+        theta_rad = np.arctan2(mat[1, 0], mat[0, 0])
+        theta_deg = np.rad2deg(theta_rad)
+        # Normalize to [-180, 180)
+        theta_deg = (theta_deg + 180) % 360 - 180
+        return cls(x_mm, y_mm, theta_deg)
 
     def compose(self, other: Transform2D) -> Transform2D:
         """
@@ -75,9 +93,13 @@ class Transform2D:
             Composed transform
 
         Notes:
-            TODO: Implement in Step 2
+            - Matrix multiplication: mat_result = mat_self @ mat_other
+            - Order matters: self applied first, then other
         """
-        raise NotImplementedError("Transform2D.compose() - Step 2")
+        mat_self = self.to_matrix()
+        mat_other = other.to_matrix()
+        mat_result = mat_self @ mat_other
+        return Transform2D.from_matrix(mat_result)
 
     def inverse(self) -> Transform2D:
         """
@@ -87,9 +109,13 @@ class Transform2D:
             Inverse transform
 
         Notes:
-            TODO: Implement in Step 2
+            - T^-1: Reverses the transformation
+            - If T transforms points from A to B, T^-1 transforms from B to A
+            - Computed via matrix inversion
         """
-        raise NotImplementedError("Transform2D.inverse() - Step 2")
+        mat = self.to_matrix()
+        mat_inv = np.linalg.inv(mat)
+        return Transform2D.from_matrix(mat_inv)
 
     def apply(self, points: np.ndarray) -> np.ndarray:
         """
@@ -102,9 +128,23 @@ class Transform2D:
             (N, 2) transformed points in mm
 
         Notes:
-            TODO: Implement in Step 2
+            - Converts to homogeneous coordinates (N, 3)
+            - Applies transformation matrix
+            - Returns Cartesian coordinates (N, 2)
         """
-        raise NotImplementedError("Transform2D.apply() - Step 2")
+        if points.ndim != 2 or points.shape[1] != 2:
+            raise ValueError(f"Expected (N, 2) array, got shape {points.shape}")
+
+        # Convert to homogeneous coordinates (N, 3)
+        N = points.shape[0]
+        points_h = np.hstack([points, np.ones((N, 1))])
+
+        # Apply transformation
+        mat = self.to_matrix()
+        transformed_h = (mat @ points_h.T).T
+
+        # Return Cartesian coordinates
+        return transformed_h[:, :2]
 
 
 @dataclass
@@ -123,6 +163,19 @@ class FrameModel:
         - Machine coordinate system (M): mechanically defined (not yet built)
         - Corner radius and T_MF are placeholders until physically determined
         - See docs/design/01_coordinates.md for coordinate system definitions
+
+    Coordinate Systems:
+        - Frame (F): Origin at lower-left inner corner, x-axis right, y-axis up
+        - Machine (M): Physical machine coordinate system (camera/gripper reference)
+        - Transform T_MF: Maps points from Frame to Machine: p_M = T_MF.apply(p_F)
+
+    Placeholder Values:
+        - T_MF = None: Use when working purely in Frame coordinates (solver internals)
+        - T_MF can be set for simulator visualization (outside A5 frame area)
+        - T_MF default for visualization: Transform2D(200, 200, 0)
+          → Places Frame lower-left corner at (200mm, 200mm) outside origin
+          → Use utils.conversion.get_default_T_MF() for this default
+        - T_MF will be calibrated when physical machine is built
     """
     inner_width_mm: float = 128.0
     inner_height_mm: float = 190.0
