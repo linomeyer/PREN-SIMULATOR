@@ -13,7 +13,7 @@ Angles in degrees, range [-180, 180), counterclockwise positive.
 from __future__ import annotations
 from dataclasses import dataclass, field
 import numpy as np
-from typing import Optional
+from typing import Optional, Literal
 
 
 @dataclass
@@ -226,20 +226,43 @@ class MatchingConfig:
     """
     Weights for frame cost aggregation.
     Keys: dist_p90, coverage, angle_diff, flatness
+    Note: coverage/inlier weights overridden by frame_coverage_vs_inlier_policy
     TODO: Tuning
     """
 
+    frame_flat_ref_mm: float = 1.0
+    """Referenz zur Normierung von flatness_error_mm im Frame-Cost.
+       Unabhängig von frame_band_mm (Kontakt-Toleranz).
+       TODO: Tuning"""
+
+    frame_coverage_vs_inlier_policy: Literal["coverage", "inlier", "balanced"] = "coverage"
+    """Welche Metrik gewichtet wird.
+       - 'coverage': Nur coverage_in_band, inlier_ratio ignoriert
+       - 'inlier': Nur inlier_ratio, coverage_in_band ignoriert
+       - 'balanced': Beide gleichgewichtet
+       TODO: Tuning"""
+
+    pose_grob_theta_mode: Literal["zero", "side_aligned", "segment_aligned"] = "side_aligned"
+    """Wie initiale theta geschätzt wird.
+       - 'zero': theta=0 (keine Rotation)
+       - 'side_aligned': theta basierend auf Frame-Side (0° TOP/BOTTOM, 90° LEFT/RIGHT)
+       - 'segment_aligned': theta=seg.direction_angle (nur als Heuristik)
+       TODO: Tuning"""
+
+    frame_distance_mode: Literal["abs", "signed"] = "abs"
+    """Wie dist_* in FrameFeatures berechnet wird.
+       - 'abs': Absolute Distanz
+       - 'signed': Signed (positiv nach innen)"""
+
+    use_pose_uncertainty_in_solver: bool = False
+    """Wenn True: uncertainty_mm beeinflusst Seed-Ranking/Pruning.
+       Default False (uncertainty nur für Debug)."""
+
+    pose_uncertainty_penalty_weight: float = 0.0
+    """Weight für uncertainty in Ranking (wenn use_pose_uncertainty_in_solver=True)."""
+
     penalty_missing_frame_contact: float = 10.0
     """Penalty if a piece has no acceptable frame hypothesis. TODO: Tuning"""
-
-    frame_coverage_vs_inlier_policy: str = "balanced"
-    """
-    Coverage vs Inlier metric policy.
-    - "coverage": Prefer coverage_in_band metric
-    - "inlier": Prefer inlier_ratio metric
-    - "balanced": Weight both equally (default)
-    TODO: Tuning based on empirical data
-    """
 
     # ========== 2. Segmentation ==========
     target_seg_count_range: tuple[int, int] = (4, 12)
