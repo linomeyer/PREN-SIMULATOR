@@ -245,6 +245,18 @@ class MatchingConfig:
     target_seg_count_range: tuple[int, int] = (4, 12)
     """Target range for number of segments per piece"""
 
+    curvature_angle_threshold_deg: float = 30.0
+    """Split-Kriterium: lokaler Winkelwechsel > threshold. TODO: Tuning"""
+
+    curvature_window_pts: int = 5
+    """Fenster für Tangentenwinkel (ungerade Zahl). TODO: Tuning"""
+
+    enable_wraparound_merge: bool = True
+    """Erlaubt Merge zwischen letztem und erstem Segment (zyklisch)."""
+
+    wraparound_merge_dist_mm: float = 1.0
+    """Max Distanz zwischen contour[0] und contour[-1] für 'geschlossen'."""
+
     # ========== 3. Profile ==========
     profile_samples_N: int = 128
     """Number of samples for 1D profile resampling. TODO: Tuning"""
