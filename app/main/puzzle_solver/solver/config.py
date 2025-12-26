@@ -24,7 +24,12 @@ class Transform2D:
     Attributes:
         x_mm: Translation in x (mm)
         y_mm: Translation in y (mm)
-        theta_deg: Rotation angle (degrees, [-180, 180), ccw positive)
+        theta_deg: Rotation angle in degrees (CCW, counter-clockwise), range [-180, 180)
+
+    Rotation convention:
+        - CCW (positive theta = counter-clockwise)
+        - Example: theta=90° rotates point (1,0) to (0,1)
+        - Consistent with standard rotation matrix
 
     Notes:
         - Used for coordinate system transformations (Frame ↔ Machine)
@@ -215,7 +220,10 @@ class MatchingConfig:
     """Minimum segment length to be considered for frame contact (mm)"""
 
     tau_frame_mm: float = 2.0
-    """Tolerance band for inside/outside frame checks (mm, for robustness against noise)"""
+    """Tolerance band for inside/outside frame checks (mm, for robustness against noise).
+
+    Reserved for step 6 (frame validation).
+    Not used in step 4 (frame feature computation)."""
 
     frame_weights: dict[str, float] = field(default_factory=lambda: {
         "dist_p90": 0.3,
@@ -262,7 +270,10 @@ class MatchingConfig:
     """Weight für uncertainty in Ranking (wenn use_pose_uncertainty_in_solver=True)."""
 
     penalty_missing_frame_contact: float = 10.0
-    """Penalty if a piece has no acceptable frame hypothesis. TODO: Tuning"""
+    """Penalty for pieces without frame contact (reserved for step 6).
+
+    Not used in step 4 (hypothesis generation).
+    TODO: Tuning"""
 
     # ========== 2. Segmentation ==========
     target_seg_count_range: tuple[int, int] = (4, 12)
@@ -369,7 +380,15 @@ class MatchingConfig:
 
     # ========== 8. Debug ==========
     debug_topN_frame_hypotheses_per_piece: int = 5
-    """Number of top frame hypotheses to include in debug output per piece"""
+    """Number of top frame hypotheses per piece.
+
+    IMPORTANT: Controls BOTH:
+    - Algorithm: Beam-solver seeds (step 6)
+    - Debug: Logged hypotheses
+
+    Reducing this value affects solver quality.
+    Default 5 balances quality vs performance.
+    TODO: Tune based on puzzle complexity."""
 
     debug_topN_inner_candidates_per_segment: int = 5
     """Number of top inner match candidates to include in debug output per segment"""

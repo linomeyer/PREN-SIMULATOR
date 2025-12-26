@@ -321,6 +321,26 @@ frame_coverage_vs_inlier_policy: Literal["coverage", "inlier", "balanced"] = "co
 
 ---
 
+### 9. Parameter-Reservierungen für Schritt 6
+
+**Nicht verwendet in Schritt 4** (reserviert für Schritt 6):
+
+1. **tau_frame_mm**: Toleranz für inside/outside frame validation
+   - Schritt 4: Nur Hypothesis-Generierung
+   - Schritt 6: Boundary-Check (Pose außerhalb Frame prune)
+
+2. **penalty_missing_frame_contact**: Soft-constraint
+   - Schritt 4: Nur Hypothesis-Generierung
+   - Schritt 6: Beam-ranking penalty für Pieces ohne Frame-Kontakt
+
+3. **use_pose_uncertainty_in_solver + pose_uncertainty_penalty_weight**:
+   - Schritt 4: uncertainty_mm berechnet, aber nicht verwendet
+   - Schritt 6+: Optional für Ranking/Pruning
+
+**Grund**: Saubere Trennung (Schritt 4 = Generierung, Schritt 6 = Validation/Ranking)
+
+---
+
 ## Config-Parameter
 
 Aus `MatchingConfig` verwendet:
