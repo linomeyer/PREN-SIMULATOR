@@ -153,7 +153,7 @@ Siehe `implementation/00_structure.md` für detaillierte Struktur und Abhängigk
 5. Aggregation-Kommentar: "max" empfohlen für Pruning, "mean/p90" nur für Diagnose
 6. A/B Test Assertion robuster: overlap_violations statt confidence
 
-**Nächster Schritt**: ~~Schritt 1~~ ✅ ~~Schritt 2~~ ✅ → **Schritt 3 - Segmentierung + Flatness**
+**Nächster Schritt**: ~~Schritt 1-5~~ ✅ → **Schritt 6 - Beam-Solver V1** 🔄
 
 ---
 
@@ -163,55 +163,234 @@ Siehe `implementation/00_structure.md` für detaillierte Struktur und Abhängigk
 
 **Datum**: 2025-12-23
 
-**Implementiert**:
-- `solver/config.py`: Transform2D, FrameModel, MatchingConfig (245 Zeilen)
-- `solver/models.py`: 7 Datenmodelle + SolutionStatus Enum (234 Zeilen)
-- `solver/__init__.py`: solve_puzzle() API-Gerüst (105 Zeilen)
+**Fixes nach Review**: FrameHypothesis.uncertainty_mm nachgetragen
 
 **Statistik**: 584 Zeilen, 10 Klassen, 61 Felder
 
-**Dokumentation**: `implementation/01_fundament_impl.md`
+**Tests**: Models structure validation
 
-**Design-Entscheidungen**:
-- dataclass für alle Modelle (clean, Type Hints)
-- Python 3.10+ Syntax (dict[K,V], X|Y)
-- Enum für SolutionStatus
-- tuple für seg_ref (einfach, hashable)
-- Transform2D Methoden als Stubs (Implementierung Schritt 2)
+**Dokumentation**: `implementation/01_fundament_impl.md`
 
 ---
 
-### ✅ Schritt 2: Einheiten & KS - ABGESCHLOSSEN
+### ✅ Schritt 2: Einheiten & Koordinatensysteme - ABGESCHLOSSEN
 
 **Datum**: 2025-12-23
 
-**Implementiert**:
-- `solver/config.py`: Transform2D Methoden (5 Methoden, +35 Zeilen)
-  - to_matrix(), from_matrix(), compose(), inverse(), apply()
-- `solver/utils/conversion.py`: Pixel→mm Konvertierung (160 Zeilen, 5 Funktionen)
-  - convert_points_px_to_mm(), convert_contour_px_to_mm(), convert_bbox_px_to_mm()
-  - Platzhalter: get_default_scale_simulator(), get_machine_origin_offset_placeholder()
-- `solver/utils/__init__.py`: API-Exports (17 Zeilen)
-- `solver/config.py`: FrameModel Docstring erweitert (+12 Zeilen)
+**Fixes nach Review**:
+- PuzzlePiece px+mm dual fields (extraction→solver workflow)
+- Guards: validate_pieces_format(require_mm_fields), segment_piece(contour_mm None-check)
 
-**Statistik**: +224 Zeilen, 10 Funktionen (5 Transform2D + 5 Conversion)
+**Statistik**: +224 Zeilen, 10 Funktionen (Transform2D + Conversion)
+
+**Tests**: 11/11 (test_step2.py)
 
 **Dokumentation**: `implementation/02_einheiten_impl.md`
 
-**Design-Entscheidungen**:
-- Homogene Koordinaten für Transformationen (Standard-Ansatz)
-- np.linalg.inv für inverse() (Klarheit > Mikrooptimierung)
-- Separate Konvertierungsfunktionen (Typsicherheit)
-- Platzhalter-Funktionen für unbekannte Parameter (bewusst offen)
+---
 
-**Offene Punkte für spätere Schritte**:
-- Kalibrierung (scale, offset, T_MF) in Schritt 10
-- KS-Tagging in Debug (Schritt 9)
-- Corner Radius Messung (nach Rahmenbau)
+### ✅ Schritt 3: Segmentierung + Flatness - ABGESCHLOSSEN
+
+**Datum**: 2025-12-24
+
+**Implementation**: solver/segmentation/contour_segmenter.py (~473 Zeilen)
+
+**Fixes nach Review**: Keine (Design-Review akzeptiert ohne Änderungen)
+
+**Tests**: 12/12 (test_segmentation.py)
+
+**Dokumentation**: `implementation/03_segmentierung_impl.md`
+
+**Design-Entscheidungen**: Curvature-based splitting, arclength coverage, wraparound merge
 
 ---
 
-### 🔄 Schritt 3: Segmentierung + Flatness - NÄCHSTER SCHRITT
+### ✅ Schritt 4: Frame-Matching - ABGESCHLOSSEN
+
+**Datum**: 2025-12-25
+
+**Implementation**: solver/frame_matching/ (~457 Zeilen: features.py, hypotheses.py)
+
+**Fixes nach Review**: Doku-Klarstellungen (CCW rotation, TopN dual-purpose, reserved params)
+
+**Tests**: 11/11 (test_frame_matching.py)
+
+**Dokumentation**: `implementation/04_frame_matching_impl.md`
+
+**Design-Entscheidungen**:
+- Arclength-basierte coverage (robuster vs point-count)
+- Projection-based pose (Option A, schneller)
+- Policy-Switch (coverage vs inlier vs balanced)
+- Theta-Modes (zero/side_aligned/segment_aligned)
+
+---
+
+### ✅ Schritt 5: Inner-Matching - ABGESCHLOSSEN
+
+**Datum**: 2025-12-25/26
+
+**Implementation**: solver/inner_matching/ (~470 Zeilen: profile.py, candidates.py)
+
+**Fixes nach Review**:
+- Weight normalization policy (sum=1.0 assumption + runtime warning)
+- Debug fields: ncc_best, best_variant (trace/analysis)
+- Unused V1 params marked: profile_smoothing_window, frame_likelihood_threshold
+
+**Tests**: 16/16 (test_inner_matching.py)
+
+**Dokumentation**: `implementation/05_inner_matching_impl.md`
+
+**Design-Entscheidungen**:
+- Sign-flip detection (4 NCC variants: fwd/fwd_flip/rev/rev_flip)
+- Cost clamping [0,1] (consistent aggregation)
+- Profile: Signed distance (orientation-aware)
+
+---
+
+### 🔄 Schritt 6: Beam-Solver (Multi-Hypothesen State-Space Search) - NÄCHSTER
+
+**Status**: NEUER CHAT - Implementation anstehend
+
+**Module**: beam_solver/state.py, expansion.py, solver.py
+
+**Basis**: design/05_solver.md, implementation/00_structure.md §3
+
+**Kritisch**:
+- SolverState Single Source (nur in state.py)
+- EdgeID = tuple[PieceID, int] (keine Hash-Kollision)
+- Frontier: separate Sets (unplaced_pieces, open_edges)
+- Overlap: Stub für Schritt 7
+
+---
+
+## Lessons Learned (Schritte 1-5)
+
+### Workflow-Erfolge ✅
+
+1. **Test-Spec vor Code**: Design-LLM erstellt Test-Spezifikation → verhindert Test-Fitting
+   - Claude Code implementiert gegen fixe Spec
+   - Design-LLM validiert Tests NACH Implementation
+
+2. **3-Phasen Validation**:
+   - Phase 1: Test-Spec gegen Design-Docs
+   - Phase 2: Implementation gegen Test-Spec
+   - Phase 3: Code-Review gegen Design-Docs
+
+3. **Schrittweise Reviews**: Jeder Schritt einzeln validiert vor nächstem
+   - Frühe Bug-Erkennung (FIX 1/2 in Schritt 5 vor Schritt 6)
+   - Keine akkumulierten Tech-Debts
+
+4. **Code-Doku Synchronisation**: Nach jedem Fix beide prüfen
+   - Implementation → Doku update → Validation
+
+5. **Design-First Approach**: Alle Algorithmen aus design/*.md Docs
+   - Keine "guess & check" Implementation
+   - Klare Referenz für Reviews
+
+### Häufige Probleme ⚠️
+
+1. **Test-Fitting**: Claude Code passt Tests an Code statt umgekehrt
+   - Symptom: Tests passen immer, aber Design verletzt
+   - Lösung: Design-LLM validiert Test-Quality nach Implementation
+
+2. **Fehlende Config-Parameter**: In späteren Schritten nachgetragen
+   - Beispiel: FrameHypothesis.uncertainty_mm fehlte (Schritt 1 → nachgetragen in Schritt 4)
+   - Lösung: ALLE Parameter in Schritt 1, auch wenn "reserved for later"
+
+3. **Optional-Felder ohne Guards**: None-Zugriff Risiko
+   - Beispiel: PuzzlePiece.contour_mm=None → segment_piece crash
+   - Lösung: Guards am Moduleingang (validate_pieces_format, segment_piece)
+
+4. **Doku-Code Drift**: Formeln/Algorithmen unterschiedlich
+   - Beispiel: NCC formula (1-NCC vs 1-|NCC|) in Schritt 5
+   - Lösung: Nach Code-Änderung IMMER Doku aktualisieren + cross-validate
+
+5. **Unnamed Assumptions**: "Obvious" defaults nicht dokumentiert
+   - Beispiel: inner_weights sum=1.0 (nicht explizit bis Review)
+   - Lösung: ASSUMPTION-Tags in Docstrings + runtime validation
+
+### Best Practices für Schritt 6+
+
+**Config-Vollständigkeit**:
+- ✅ ALLE Parameter vorhanden? (beam_width, max_expansions, penalties)
+- ✅ Reserved params als "UNUSED V1" markiert?
+- ✅ Default values plausibel dokumentiert?
+
+**Guards & Validation**:
+- ✅ SolverState invariants? (placed_pieces ⊆ all pieces, etc.)
+- ✅ None-checks am Moduleingang?
+- ✅ validate_*() functions für komplexe inputs?
+
+**Test-Quality**:
+- ✅ Konkrete numerische Erwartungen? (nicht nur "should work")
+- ✅ Edge cases aus design/09_edgecases.md abgedeckt?
+- ✅ Test-Spec BEVOR Implementation?
+
+**Design-Alignment**:
+- ✅ Code folgt design/*.md Algorithmen exakt?
+- ✅ Doku update nach jeder Code-Änderung?
+- ✅ Cross-validation (Code ↔ Doku ↔ Tests)?
+
+---
+
+## Nächste Schritte: Schritt 6 Implementation Plan
+
+### Phase 1: Test-Spezifikation (Design-LLM)
+
+**Module 1: beam_solver/state.py** (SolverState)
+- Test: State initialization (empty, seeded)
+- Test: Frontier computation (unplaced_pieces, open_edges)
+- Test: is_complete() logic (all placed AND all edges matched)
+- Test: State invariants (placed ⊆ all, no conflicts)
+
+**Module 2: beam_solver/expansion.py** (expand_state)
+- Test: Place piece via frame hypothesis
+- Test: Place piece via inner match (2-piece connection)
+- Test: Edge opening/closing after placement
+- Test: Invalid expansions filtered (overlap stub, outside frame)
+
+**Module 3: beam_solver/solver.py** (beam_search)
+- Test: Seeding (frame hypotheses + empty state)
+- Test: Beam expansion loop (breadth-first)
+- Test: Pruning (beam_width limit, overlap stub)
+- Test: Solution extraction (complete states ranked)
+
+### Phase 2: Implementation (Claude Code)
+
+**Reihenfolge**: state.py → expansion.py → solver.py
+
+**Nach jedem Modul**:
+1. Run tests
+2. Design-LLM: Test-Quality validation
+3. Fix issues before next module
+
+### Phase 3: Integration & Validation
+
+**Design-LLM Review**:
+- Implementation gegen design/05_solver.md
+- Edge cases aus design/09_edgecases.md
+- Config-Vollständigkeit
+- Guards & None-checks
+
+**Kritische Checks**:
+- ✅ SolverState NUR in state.py (Single Source of Truth)
+- ✅ EdgeID = tuple[PieceID, int] (no hash collision)
+- ✅ Frontier: separate Sets (not Union)
+- ✅ Overlap: Stub returns 0.0 (implementation Schritt 7)
+- ✅ No hardcoded magic numbers (all in MatchingConfig)
+
+### Abhängigkeiten
+
+**Benötigt aus Schritt 1-5**:
+- ✅ ContourSegment (Schritt 3)
+- ✅ FrameHypothesis (Schritt 4)
+- ✅ InnerMatchCandidate (Schritt 5)
+- ✅ MatchingConfig.beam_width, max_expansions (Schritt 1)
+
+**Liefert für Schritt 7+**:
+- SolverState (beam search states)
+- expand_state() (state transitions)
+- beam_search() (main solver loop)
 
 ---
 
