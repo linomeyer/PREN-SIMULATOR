@@ -258,7 +258,8 @@ def get_default_T_MF() -> Transform2D:
 
 def validate_pieces_format(
     pieces: List[PuzzlePiece],
-    max_mm_extent: float = 1000.0
+    max_mm_extent: float = 1000.0,
+    require_mm_fields: bool = False
 ) -> None:
     """
     Validate PuzzlePiece format (raises ValueError on invalid input).
@@ -268,9 +269,12 @@ def validate_pieces_format(
         max_mm_extent: Maximum plausible extent in mm (Frame-KS).
                       Default 1000mm = 1m (far beyond typical frame).
                       Adjust for different coordinate systems if needed.
+        require_mm_fields: If True, requires contour_mm/bbox_mm to be set (for solver path).
+                          If False, allows None (for extraction output before conversion).
 
     Raises:
         ValueError: If any piece has invalid format:
+            - (if require_mm_fields) contour_mm or bbox_mm is None
             - contour_mm not (N, 2) with N >= 3
             - bbox_mm not tuple of 4 floats
             - center_mm not (2,) if present
@@ -279,19 +283,41 @@ def validate_pieces_format(
     Notes:
         - Called before solver processing to fail-fast on invalid inputs
         - mm-plausibility check: Prevents accidental use of pixel coordinates
+        - require_mm_fields guard: Prevents None-access in solver pipeline
         - See docs/design/02_datamodels.md §PuzzlePiece for format specification
 
     Example:
-        >>> validate_pieces_format(pieces)  # Default: max 1000mm
-        >>> validate_pieces_format(pieces, max_mm_extent=500.0)  # Custom limit
+        >>> validate_pieces_format(pieces)  # Default: accepts None mm-fields
+        >>> validate_pieces_format(pieces, require_mm_fields=True)  # Solver guard
     """
     from ..models import PuzzlePiece
 
     if not pieces:
         raise ValueError("Empty pieces list")
 
+    # Guard: Check mm-fields are present if required
+    if require_mm_fields:
+        for i, piece in enumerate(pieces):
+            missing = []
+            if piece.contour_mm is None:
+                missing.append("contour_mm")
+            if piece.bbox_mm is None:
+                missing.append("bbox_mm")
+            # center_mm is optional (allowed to be None)
+
+            if missing:
+                raise ValueError(
+                    f"Piece {piece.piece_id} (index {i}) missing required mm fields: {', '.join(missing)}. "
+                    f"Run convert_pieces_px_to_mm() before passing to solver."
+                )
+
     for i, piece in enumerate(pieces):
-        # Check contour_mm shape
+        # Check contour_mm shape (skip if None and not required)
+        if piece.contour_mm is None:
+            if not require_mm_fields:
+                continue  # Allow None if not required
+            # If require_mm_fields=True, would have raised above
+
         if not isinstance(piece.contour_mm, np.ndarray):
             raise ValueError(f"Piece {piece.piece_id}: contour_mm must be ndarray, got {type(piece.contour_mm)}")
 
@@ -307,7 +333,12 @@ def validate_pieces_format(
                 f"got {piece.contour_mm.shape[0]}"
             )
 
-        # Check bbox_mm format
+        # Check bbox_mm format (skip if None and not required)
+        if piece.bbox_mm is None:
+            if not require_mm_fields:
+                continue  # Allow None if not required
+            # If require_mm_fields=True, would have raised above
+
         if not isinstance(piece.bbox_mm, tuple) or len(piece.bbox_mm) != 4:
             raise ValueError(
                 f"Piece {piece.piece_id}: bbox_mm must be tuple of 4 floats, "
@@ -378,24 +409,24 @@ def convert_pieces_px_to_mm(
     converted_pieces = []
 
     for piece in pieces:
-        # Convert contour
+        # Convert contour from px to mm
         contour_mm = convert_contour_px_to_mm(
-            piece.contour_mm,
+            piece.contour,  # Read from px field
             scale_px_to_mm,
             origin_offset_mm
         )
 
-        # Convert bbox
+        # Convert bbox from px to mm
         bbox_mm = convert_bbox_px_to_mm(
-            piece.bbox_mm,
+            piece.bbox,  # Read from px field
             scale_px_to_mm,
             origin_offset_mm
         )
 
         # Convert center if present
         center_mm = None
-        if piece.center_mm is not None:
-            center_px = piece.center_mm.reshape(1, 2)  # (2,) -> (1, 2)
+        if piece.center is not None:  # Check px field
+            center_px = piece.center.reshape(1, 2)  # (2,) -> (1, 2)
             center_mm_arr = convert_points_px_to_mm(
                 center_px,
                 scale_px_to_mm,

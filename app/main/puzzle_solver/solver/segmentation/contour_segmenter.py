@@ -49,6 +49,9 @@ def segment_piece(piece: PuzzlePiece, config: MatchingConfig) -> List[ContourSeg
         - Closed contours: First point ≈ last point assumed
         - Edge cases: Accept < 4 or > 12 segments if merge constraints violated
 
+    Raises:
+        ValueError: If piece.contour_mm is None (must run convert_pieces_px_to_mm() first)
+
     Example:
         >>> piece = PuzzlePiece(piece_id=1, contour_mm=..., ...)
         >>> config = MatchingConfig()
@@ -56,6 +59,13 @@ def segment_piece(piece: PuzzlePiece, config: MatchingConfig) -> List[ContourSeg
         >>> assert 4 <= len(segments) <= 12
     """
     from ..models import ContourSegment
+
+    # Guard: Ensure contour_mm is present
+    if piece.contour_mm is None:
+        raise ValueError(
+            f"Piece {piece.piece_id}: contour_mm is None. "
+            f"Run convert_pieces_px_to_mm() before segmentation."
+        )
 
     contour_mm = piece.contour_mm
     target_range = config.target_seg_count_range

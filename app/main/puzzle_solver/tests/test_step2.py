@@ -111,36 +111,36 @@ def test_metadata_extraction():
 
 
 def test_convert_pieces_px_to_mm():
-    """Test 7: Batch conversion of PuzzlePiece list."""
+    """Test 7: Batch conversion of PuzzlePiece list (realistic extraction input)."""
     print("Test 7: convert_pieces_px_to_mm...", end=" ")
 
-    # Create 2 test pieces in pixels
+    # Create 2 test pieces with px fields (as from extraction)
     piece1 = PuzzlePiece(
         piece_id=1,
-        contour_mm=np.array([[100, 200], [150, 250], [120, 230]]),  # Still named contour_mm but values in px
+        contour=np.array([[100, 200], [150, 250], [120, 230]]),  # px field
         mask=np.zeros((10, 10), dtype=np.uint8),
-        bbox_mm=(100, 200, 150, 250),  # In px
-        center_mm=np.array([125, 225])  # In px
+        bbox=(100, 200, 150, 250),  # px field
+        center=np.array([125, 225])  # px field
     )
 
     piece2 = PuzzlePiece(
         piece_id=2,
-        contour_mm=np.array([[200, 300], [250, 350], [220, 330]]),
+        contour=np.array([[200, 300], [250, 350], [220, 330]]),  # px field
         mask=np.zeros((10, 10), dtype=np.uint8),
-        bbox_mm=(200, 300, 250, 350),
-        center_mm=None  # Test optional center
+        bbox=(200, 300, 250, 350),  # px field
+        center=None  # Test optional center
     )
 
     pieces_px = [piece1, piece2]
     scale = 0.1  # 0.1 mm/px
 
-    # Convert
+    # Convert (fills _mm fields)
     pieces_mm = convert_pieces_px_to_mm(pieces_px, scale)
 
     # Validate
     assert len(pieces_mm) == 2, f"Expected 2 pieces, got {len(pieces_mm)}"
 
-    # Check piece 1
+    # Check piece 1 - mm fields filled
     assert pieces_mm[0].piece_id == 1
     assert np.allclose(pieces_mm[0].contour_mm, [[10, 20], [15, 25], [12, 23]], atol=1e-10)
     assert pieces_mm[0].bbox_mm == (10.0, 20.0, 15.0, 25.0)
@@ -228,6 +228,35 @@ def test_validate_pieces_format():
     except ValueError as e:
         assert "Suspicious contour_mm values" in str(e)
         assert "100.0mm" in str(e)  # Check error message includes limit
+
+    print("✓")
+
+
+def test_validate_pieces_require_mm_fields():
+    """Test 11: validate_pieces_format with require_mm_fields=True."""
+    print("Test 11: validate_pieces_require_mm_fields...", end=" ")
+
+    # Piece with only px fields (not yet converted)
+    piece_px_only = PuzzlePiece(
+        piece_id=1,
+        contour=np.array([[0, 0], [10, 0], [10, 10]]),  # px field
+        bbox=(0, 0, 10, 10),  # px field
+        mask=np.ones((10, 10), dtype=bool)
+        # contour_mm/bbox_mm NOT set (None)
+    )
+
+    # Should raise ValueError with require_mm_fields=True
+    try:
+        validate_pieces_format([piece_px_only], require_mm_fields=True)
+        raise AssertionError("Should have raised ValueError for missing mm fields")
+    except ValueError as e:
+        assert "missing required mm fields" in str(e)
+        assert "contour_mm" in str(e)
+        assert "bbox_mm" in str(e)
+
+    # After conversion should pass
+    converted = convert_pieces_px_to_mm([piece_px_only], scale_px_to_mm=0.1)
+    validate_pieces_format(converted, require_mm_fields=True)  # OK
 
     print("✓")
 

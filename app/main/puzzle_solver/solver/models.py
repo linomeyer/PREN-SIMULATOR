@@ -46,28 +46,47 @@ class Pose2D:
 @dataclass
 class PuzzlePiece:
     """
-    Input puzzle piece from extraction module.
+    Puzzle piece supporting both extraction (px) and solver (mm) coordinates.
+
+    Workflow:
+        1. Extraction: Creates with contour/bbox/center (px)
+        2. Conversion: convert_pieces_px_to_mm() fills contour_mm/bbox_mm/center_mm
+        3. Solver: Uses contour_mm/bbox_mm/center_mm
 
     Attributes:
         piece_id: Unique piece identifier
-        contour_mm: Contour points in mm, shape (N, 2), coordinate system M
+        contour: Contour points in px (from extraction), shape (N, 2)
+        bbox: Bounding box in px (x_min, y_min, x_max, y_max)
+        center: Center of mass in px, shape (2,)
+        contour_mm: Contour points in mm (filled by conversion), shape (N, 2), KS M
+        bbox_mm: Bounding box in mm (filled by conversion), KS M
+        center_mm: Center of mass in mm (filled by conversion), shape (2,), KS M
         mask: Binary mask, shape (H, W)
-        bbox_mm: Bounding box in mm (x_min, y_min, x_max, y_max) in M
         image: Optional texture image (RGBA)
-        center_mm: Optional center of mass in mm, shape (2,) in M
 
     Notes:
-        - Input from piece_extraction module
+        - Input from piece_extraction module with px coordinates
+        - convert_pieces_px_to_mm() converts px → mm
+        - Solver uses only _mm fields
         - Coordinate system M (Machine) or intermediate extraction system
         - Converted to Frame system (F) internally by solver
         - See docs/implementation/00_structure.md §1.1 for integration
     """
     piece_id: int | str
-    contour_mm: np.ndarray  # (N, 2) in mm, KS M
-    mask: np.ndarray  # (H, W) binary
-    bbox_mm: tuple[float, float, float, float]  # (x_min, y_min, x_max, y_max) in M
+
+    # Extraction output (px) - optional:
+    contour: Optional[np.ndarray] = None  # (N, 2) in px
+    bbox: Optional[tuple[float, float, float, float]] = None  # px
+    center: Optional[np.ndarray] = None  # (2,) in px
+
+    # Solver input (mm) - filled by convert_pieces_px_to_mm():
+    contour_mm: Optional[np.ndarray] = None  # (N, 2) in mm, KS M
+    bbox_mm: Optional[tuple[float, float, float, float]] = None  # mm, KS M
+    center_mm: Optional[np.ndarray] = None  # (2,) in mm, KS M
+
+    # Metadata:
+    mask: Optional[np.ndarray] = None  # (H, W) binary
     image: Optional[np.ndarray] = None  # Texture (optional)
-    center_mm: Optional[np.ndarray] = None  # (2,) Schwerpunkt in M
 
 
 @dataclass
@@ -145,12 +164,14 @@ class FrameHypothesis:
         features: Raw frame contact metrics
         cost_frame: Aggregated frame contact cost
         is_committed: Whether this hypothesis is committed in solver state
+        uncertainty_mm: Pose uncertainty estimate in mm (default 5.0mm, pessimistic)
 
     Notes:
         - pose_grob_F: Initial estimate from estimate_pose_grob_F()
         - Coordinate system: Frame (F), origin at lower-left inner corner
         - cost_frame = Σ w_k * cost_k(features_k) via MatchingConfig.frame_weights
         - is_committed: False initially, set True in solver when used
+        - uncertainty_mm: Estimated pose uncertainty (used if use_pose_uncertainty_in_solver=True)
     """
     piece_id: int | str
     segment_id: int
@@ -159,6 +180,7 @@ class FrameHypothesis:
     features: FrameContactFeatures
     cost_frame: float
     is_committed: bool = False
+    uncertainty_mm: float = 5.0
 
 
 @dataclass

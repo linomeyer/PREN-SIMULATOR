@@ -312,6 +312,29 @@ def test_wraparound_merge_closed_contour():
     print(f"✓ ({len(segments_nowrap)} → {len(segments_wrap)} segments with wraparound)")
 
 
+def test_segment_piece_requires_mm():
+    """Test 12: segment_piece raises ValueError if contour_mm is None."""
+    print("Test 12: segment_piece_requires_mm...", end=" ")
+
+    piece_no_mm = PuzzlePiece(
+        piece_id=1,
+        contour=np.array([[0, 0], [20, 0], [20, 20], [0, 20]]),  # px only
+        # contour_mm NOT set (None)
+        mask=np.ones((20, 20), dtype=bool),
+        bbox=(0, 0, 20, 20)
+    )
+
+    config = MatchingConfig()
+
+    try:
+        segment_piece(piece_no_mm, config)
+        raise AssertionError("Should have raised ValueError for missing contour_mm")
+    except ValueError as e:
+        assert "contour_mm is None" in str(e)
+
+    print("✓")
+
+
 def run_all_tests():
     """Run all segmentation tests."""
     print("=" * 60)
@@ -330,10 +353,11 @@ def run_all_tests():
     test_segment_piece_simple_contour()
     test_segment_piece_high_threshold()
     test_wraparound_merge_closed_contour()
+    test_segment_piece_requires_mm()
 
     print()
     print("=" * 60)
-    print("✅ Alle Tests bestanden (11/11)")
+    print("✅ Alle Tests bestanden (12/12)")
     print("=" * 60)
 
 
