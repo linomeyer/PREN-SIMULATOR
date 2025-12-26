@@ -285,7 +285,8 @@ class MatchingConfig:
     """Number of samples for 1D profile resampling. TODO: Tuning"""
 
     profile_smoothing_window: int = 3
-    """Smoothing window for profile (3/5/adaptive). TODO: Tuning"""
+    """DEAKTIVIERT: Smoothing currently disabled (return raw resampled profile).
+       Reserved for future experiments (3/5/adaptive). TODO: Tuning"""
 
     # ========== 4. Inner matching ==========
     topk_per_segment: int = 10
@@ -304,6 +305,15 @@ class MatchingConfig:
     Keys: profile, length, fit
     TODO: Tuning
     """
+
+    length_tolerance_ratio: float = 0.15
+    """Length mismatch tolerance for prefiltering (15% strict). TODO: Tuning"""
+
+    flatness_tolerance_mm: float = 2.0
+    """Flatness mismatch tolerance for prefiltering (mm). TODO: Tuning"""
+
+    frame_likelihood_threshold: float = 0.5
+    """Frame cost threshold for prefiltering inner candidates (prefer inner edges). TODO: Tuning"""
 
     # ========== 5. Solver ==========
     beam_width: int = 20

@@ -170,15 +170,17 @@ class InnerMatchCandidate:
         seg_a_ref: Reference to segment A as (piece_id, segment_id)
         seg_b_ref: Reference to segment B as (piece_id, segment_id)
         cost_inner: Aggregated inner match cost
-        profile_cost: 1D profile similarity cost (1 - NCC)
+        profile_cost: 1D profile similarity cost (1 - |NCC|)
         length_cost: Length compatibility cost
         fit_cost: Geometric fit cost (ICP if enabled, else 0)
         reversal_used: Whether segment B was reversed for matching
+        sign_flip_used: Whether segment B profile was sign-flipped (opposite side of chord)
 
     Notes:
         - cost_inner = w_profile * profile_cost + w_length * length_cost + w_fit * fit_cost
         - Weights from MatchingConfig.inner_weights
         - reversal_used: True if profile_b was reversed for better NCC
+        - sign_flip_used: True if profile_b was negated (opposite-side orientation)
         - See docs/design/03_matching.md Phase 3 for matching algorithm
     """
     seg_a_ref: tuple[int | str, int]  # (piece_id, segment_id)
@@ -188,6 +190,7 @@ class InnerMatchCandidate:
     length_cost: float
     fit_cost: float
     reversal_used: bool
+    sign_flip_used: bool = False
 
 
 class SolutionStatus(Enum):
