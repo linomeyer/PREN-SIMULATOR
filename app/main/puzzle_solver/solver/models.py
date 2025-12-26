@@ -197,12 +197,16 @@ class InnerMatchCandidate:
         fit_cost: Geometric fit cost (ICP if enabled, else 0)
         reversal_used: Whether segment B was reversed for matching
         sign_flip_used: Whether segment B profile was sign-flipped (opposite side of chord)
+        ncc_best: Best NCC correlation value (for debug/trace)
+        best_variant: Which NCC variant achieved best match
+                     ("fwd" | "fwd_flip" | "rev" | "rev_flip")
 
     Notes:
         - cost_inner = w_profile * profile_cost + w_length * length_cost + w_fit * fit_cost
         - Weights from MatchingConfig.inner_weights
         - reversal_used: True if profile_b was reversed for better NCC
         - sign_flip_used: True if profile_b was negated (opposite-side orientation)
+        - Debug fields (ncc_best, best_variant) for analysis/tracing only
         - See docs/design/03_matching.md Phase 3 for matching algorithm
     """
     seg_a_ref: tuple[int | str, int]  # (piece_id, segment_id)
@@ -213,6 +217,9 @@ class InnerMatchCandidate:
     fit_cost: float
     reversal_used: bool
     sign_flip_used: bool = False
+    # Debug fields (optional, for trace/analysis):
+    ncc_best: float = 0.0
+    best_variant: str = "fwd"
 
 
 class SolutionStatus(Enum):

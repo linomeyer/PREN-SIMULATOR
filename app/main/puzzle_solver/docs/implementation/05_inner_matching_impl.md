@@ -182,7 +182,7 @@ frame_likelihood_threshold: float = 0.5
 
 ---
 
-### 6. tests/test_inner_matching.py (11 Tests, ~360 Zeilen)
+### 6. tests/test_inner_matching.py (16 Tests, ~540 Zeilen)
 
 #### Test 1: test_profile_extraction_straight()
 - **Prüft**: Gerade Linie → Profile ≈ 0
@@ -248,6 +248,36 @@ frame_likelihood_threshold: float = 0.5
 - **Prüft**: ICP placeholder returns 0.0
 - **Testdaten**: enable_icp=True/False
 - **Ergebnis**: disabled=0.0, enabled=0.0 (beide placeholder)
+- **Status**: ✅ Pass
+
+#### Test 12: test_profile_invariance_rigid_transform()
+- **Prüft**: Profile invariant unter Starrkörper-Transformation
+- **Testdaten**: Segment translation + rotation (45°)
+- **Ergebnis**: max_diff=0.000000 (identical profiles)
+- **Status**: ✅ Pass
+
+#### Test 13: test_ncc_constant_signal_no_nan()
+- **Prüft**: NaN-Handling bei konstanten Signalen (σ=0)
+- **Testdaten**: profile_a=[1,1,1], profile_b=[2,2,2]
+- **Ergebnis**: NCC=0.0000 (no NaN, fallback)
+- **Status**: ✅ Pass
+
+#### Test 14: test_prefilter_flatness()
+- **Prüft**: Flatness tolerance prefiltering
+- **Testdaten**: flatness=0.5mm (OK), 3.0mm (> 2.0mm filtered)
+- **Ergebnis**: candidates=0 (beide filtered)
+- **Status**: ✅ Pass
+
+#### Test 15: test_generate_candidates_prefers_profile_over_length()
+- **Prüft**: Weight validation (profile > length in cost)
+- **Testdaten**: Straight (profile_cost=0) vs curved (profile_cost=0.6)
+- **Ergebnis**: straight=0.000 < curved=0.600
+- **Status**: ✅ Pass
+
+#### Test 16: test_candidate_cost_decomposition()
+- **Prüft**: Cost aggregation formula validation
+- **Testdaten**: profile=0.1, length=0.8, fit=0.5, weights={p:0.6, l:0.2, f:0.2}
+- **Ergebnis**: cost_inner=0.6635 (manual computation matches)
 - **Status**: ✅ Pass
 
 ---
@@ -396,6 +426,61 @@ frame_likelihood_threshold: float = 0.5
 
 ---
 
+## Design-Entscheidungen nach Review
+
+### 10. Weight-Normierung Policy
+
+**ASSUMPTION**: `inner_weights` sollte zu 1.0 summieren für `cost_inner ∈ [0,1]`
+
+**Default**: `{profile: 0.6, length: 0.2, fit: 0.2}` → sum = 1.0 ✓
+
+**Bei custom weights mit Σ ≠ 1.0**:
+- `cost_inner` range wird `[0, Σ weights]` statt `[0, 1]`
+- Beam-Solver ranking funktioniert weiter (relative Costs)
+- Thresholds/Debug benötigen evtl. Anpassung
+- **Runtime warning** logged wenn `|sum - 1.0| > 0.01`
+
+**Implementation**: `generate_inner_candidates()` validiert weights bei Aufruf
+
+**Entscheidung**: Default sum=1.0, runtime warning bei Abweichung (opt-in validation)
+
+---
+
+### 11. Unused Parameters (V1)
+
+**Reserviert für zukünftige Features**:
+
+1. **`profile_smoothing_window`**: Noise robustness
+   - V1: Smoothing disabled (raw resampled profile returned)
+   - TODO: Implement moving average/Gaussian für noisy contours
+
+2. **`frame_likelihood_threshold`**: Inner-vs-Frame Prefilter
+   - V1: Prefilter not implemented
+   - TODO: Implement in `generate_candidates()` as Filter 4 (prefer inner over frame edges)
+
+**Grund**: Saubere API (Parameter reserviert), Implementation nach Bedarf (step 6/future)
+
+---
+
+### 12. Debug-Felder (Optional)
+
+**InnerMatchCandidate** enthält zusätzlich:
+- `ncc_best: float` - Best NCC correlation value `[-1, 1]`
+- `best_variant: str` - Welche Variante matched: `"fwd" | "fwd_flip" | "rev" | "rev_flip"`
+
+**Nutzen**:
+- Solver-Debug: Trace welche Orientierung matched
+- Analysis: Sign-flip vs reversal statistics
+- Visualization: Highlight opposite-side matches
+
+**Konsistenz-Checks** (validiert in tests):
+- `sign_flip_used=True` → `"flip" in best_variant`
+- `reversal_used=True` → `"rev" in best_variant`
+
+**Entscheidung**: Optional debug fields (default values: 0.0, "fwd") für trace/analysis
+
+---
+
 ## Config-Parameter
 
 Aus `MatchingConfig` verwendet:
@@ -468,7 +553,7 @@ Komponenten:
 
 ## Validierung
 
-### Tests (11/11 bestanden)
+### Tests (16/16 bestanden)
 
 ```
 Test 1: profile_extraction_straight... ✓ (max_abs=0.0000)
@@ -482,15 +567,24 @@ Test 8: prefilter_length... ✓ (candidates=1)
 Test 9: prefilter_piece_id... ✓ (candidates=1)
 Test 10: generate_candidates_basic... ✓ (keys=4, cands_1_0=2)
 Test 11: icp_stub... ✓ (disabled=0.0, enabled=0.0)
+Test 12: profile_invariance_rigid_transform... ✓ (max_diff=0.000000)
+Test 13: ncc_constant_signal_no_nan... ✓ (NCC=0.0000)
+Test 14: prefilter_flatness... ✓ (candidates=0)
+Test 15: generate_candidates_prefers_profile_over_length... ✓ (straight=0.000, curved=0.600)
+Test 16: candidate_cost_decomposition... ✓ (cost_inner=0.6635, expected=0.6635)
 ```
 
 **Test-Abdeckung**:
 - ✅ Profile-Extraktion (Gerade, Curved, Degenerate)
 - ✅ NCC-Berechnung (Identical, Reversed, Different)
+- ✅ NaN-Handling (Konstante Signale)
 - ✅ Length-Cost (verschiedene Differenzen)
-- ✅ Prefiltering (Length, Piece ID)
+- ✅ Prefiltering (Length, Flatness, Piece ID)
 - ✅ Candidate-Generierung (Multi-Piece, Top-k, Sortierung)
 - ✅ ICP-Stub (Placeholder)
+- ✅ Profile-Invarianz (Rigid transforms)
+- ✅ Cost-Aggregation (Weight validation)
+- ✅ Debug-Felder (ncc_best, best_variant)
 
 ---
 
@@ -500,14 +594,15 @@ Test 11: icp_stub... ✓ (disabled=0.0, enabled=0.0)
 |-----------------------------------|--------|------------|--------------------------|
 | inner_matching/__init__.py        | 21     | 0          | API-Exports              |
 | inner_matching/profile.py         | 118    | 1          | Profile-Extraktion       |
-| inner_matching/candidates.py      | 320    | 6          | NCC + Prefilter + Gen    |
-| tests/test_inner_matching.py      | 360    | 11 (tests) | Vollständige Abdeckung   |
-| **Gesamt**                        | **819**| **18**     | **3 neu, 1 test**        |
+| inner_matching/candidates.py      | 470    | 6          | NCC + Prefilter + Gen + Debug |
+| tests/test_inner_matching.py      | 540    | 16 (tests) | Vollständige Abdeckung   |
+| **Gesamt**                        | **1149**| **23**    | **3 neu, 1 test**        |
 
 **Änderungen**:
 - solver/config.py: +3 Felder (length_tolerance_ratio, flatness_tolerance_mm, frame_likelihood_threshold)
-- solver/inner_matching/: ~459 Zeilen (neu)
-- tests/: ~360 Zeilen (neu)
+- solver/models.py: InnerMatchCandidate +2 debug fields (ncc_best, best_variant)
+- solver/inner_matching/: ~470 Zeilen (neu + debug fields)
+- tests/: ~540 Zeilen (16 tests)
 
 ---
 

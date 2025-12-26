@@ -348,6 +348,27 @@ def test_generate_candidates_basic():
             assert cand.fit_cost == 0.0, \
                 f"fit_cost should be 0.0 (stub), got {cand.fit_cost}"
 
+    # Validate debug fields (ncc_best, best_variant)
+    for seg_ref, cand_list in candidates.items():
+        for cand in cand_list:
+            # ncc_best should be in [-1, 1]
+            assert -1.0 <= cand.ncc_best <= 1.0, \
+                f"ncc_best out of range: {cand.ncc_best}"
+
+            # best_variant should be one of 4 variants
+            assert cand.best_variant in ["fwd", "fwd_flip", "rev", "rev_flip"], \
+                f"Invalid best_variant: {cand.best_variant}"
+
+            # Consistency: sign_flip_used → variant contains "flip"
+            if cand.sign_flip_used:
+                assert "flip" in cand.best_variant, \
+                    f"sign_flip_used=True but variant={cand.best_variant}"
+
+            # Consistency: reversal_used → variant contains "rev"
+            if cand.reversal_used:
+                assert "rev" in cand.best_variant, \
+                    f"reversal_used=True but variant={cand.best_variant}"
+
     print(f"Test 10: generate_candidates_basic... ✓ (keys={len(candidates)}, cands_1_0={len(cands_1_0)})")
 
 

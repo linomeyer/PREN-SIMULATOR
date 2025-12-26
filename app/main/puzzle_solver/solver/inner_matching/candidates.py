@@ -416,6 +416,16 @@ def generate_inner_candidates(
         ...     assert cands[0].cost_inner <= cands[-1].cost_inner  # Sorted
     """
     from ..models import InnerMatchCandidate
+    import warnings
+
+    # Validate weight normalization (should sum to 1.0 for cost_inner ∈ [0,1])
+    weight_sum = sum(config.inner_weights.values())
+    if abs(weight_sum - 1.0) > 0.01:
+        warnings.warn(
+            f"inner_weights sum={weight_sum:.3f} ≠ 1.0. "
+            f"cost_inner range will be [0, {weight_sum:.3f}] instead of [0, 1]. "
+            f"Beam-Solver ranking still works, but thresholds may need adjustment."
+        )
 
     result = defaultdict(list)
     top_k = config.topk_per_segment
@@ -434,6 +444,16 @@ def generate_inner_candidates(
         for seg_b in candidates_b:
             cost_inner, features, reversal_used, sign_flip_used = _compute_inner_cost(seg_a, seg_b, config)
 
+            # Determine variant name for debug
+            if reversal_used and sign_flip_used:
+                variant = "rev_flip"
+            elif reversal_used:
+                variant = "rev"
+            elif sign_flip_used:
+                variant = "fwd_flip"
+            else:
+                variant = "fwd"
+
             # Create InnerMatchCandidate
             cand = InnerMatchCandidate(
                 seg_a_ref=(seg_a.piece_id, seg_a.segment_id),
@@ -443,7 +463,9 @@ def generate_inner_candidates(
                 length_cost=features["length_cost"],
                 fit_cost=features["fit_cost"],
                 reversal_used=reversal_used,
-                sign_flip_used=sign_flip_used
+                sign_flip_used=sign_flip_used,
+                ncc_best=features["ncc_best"],
+                best_variant=variant
             )
 
             candidate_list.append(cand)

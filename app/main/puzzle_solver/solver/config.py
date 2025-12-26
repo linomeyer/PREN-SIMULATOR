@@ -296,8 +296,11 @@ class MatchingConfig:
     """Number of samples for 1D profile resampling. TODO: Tuning"""
 
     profile_smoothing_window: int = 3
-    """DEAKTIVIERT: Smoothing currently disabled (return raw resampled profile).
-       Reserved for future experiments (3/5/adaptive). TODO: Tuning"""
+    """Window size for profile smoothing.
+
+    UNUSED IN V1: Smoothing disabled (raw resampled profile returned).
+    Reserved for noise robustness (moving average/Gaussian).
+    TODO: Implement smoothing for noisy contours"""
 
     # ========== 4. Inner matching ==========
     topk_per_segment: int = 10
@@ -311,11 +314,18 @@ class MatchingConfig:
         "length": 0.2,
         "fit": 0.2
     })
-    """
-    Weights for inner match cost aggregation.
+    """Weights for inner cost aggregation.
     Keys: profile, length, fit
-    TODO: Tuning
-    """
+
+    ASSUMPTION: Weights should sum to 1.0 for cost_inner ∈ [0,1].
+    Default: {profile: 0.6, length: 0.2, fit: 0.2} → sum = 1.0 ✓
+
+    If custom weights don't sum to 1.0:
+    - cost_inner range becomes [0, sum(weights)]
+    - Beam-Solver ranking still works (relative costs)
+    - Runtime warning logged if |sum - 1.0| > 0.01
+
+    TODO: Tuning"""
 
     length_tolerance_ratio: float = 0.15
     """Length mismatch tolerance for prefiltering (15% strict). TODO: Tuning"""
@@ -324,7 +334,11 @@ class MatchingConfig:
     """Flatness mismatch tolerance for prefiltering (mm). TODO: Tuning"""
 
     frame_likelihood_threshold: float = 0.5
-    """Frame cost threshold for prefiltering inner candidates (prefer inner edges). TODO: Tuning"""
+    """Threshold for frame-likelihood prefilter.
+
+    UNUSED IN V1: Prefilter not implemented (reserved for step 6/future).
+    Purpose: Prefer inner edges over frame edges in candidate generation.
+    TODO: Implement in generate_candidates() as Filter 4"""
 
     # ========== 5. Solver ==========
     beam_width: int = 20
