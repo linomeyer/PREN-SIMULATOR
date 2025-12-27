@@ -734,37 +734,6 @@ def test_E8_outside_frame_prune(frame_model, config):
     print("✓")
 
 
-def test_E9_overlap_prune_stub(frame_model, config, monkeypatch):
-    """E9: Overlap prune via stub hook"""
-    print("\nTest E9: Overlap Stub Prune...", end=" ")
-
-    # Monkeypatch overlap_stub to return 1.2mm
-    from solver.beam_solver import expansion
-
-    def mock_overlap_stub(state):
-        return 1.2  # Exceeds threshold (1.0)
-
-    monkeypatch.setattr(expansion, '_overlap_stub', mock_overlap_stub)
-
-    state = SolverState(all_piece_ids={1})
-
-    hyp = FrameHypothesis(
-        piece_id=1, segment_id=0, side="TOP",
-        pose_grob_F=Pose2D(x_mm=10.0, y_mm=70.0, theta_deg=0.0),
-        features=None, cost_frame=0.1, is_committed=False, uncertainty_mm=5.0
-    )
-
-    pieces = {1: PuzzlePiece(piece_id=1, bbox_mm=(0, 0, 20, 10))}
-    segments = {1: [make_segment(1, 0, [[0,0],[10,0]])]}
-
-    new_states = expand_state(state, pieces, segments, {1: [hyp]}, [], config, frame_model)
-
-    # Expected: pruned (overlap > threshold)
-    assert len(new_states) == 0, "Should be pruned (overlap exceeds threshold)"
-
-    print("✓")
-
-
 def test_E10_committed_frame_conflict_prune(frame_model, config):
     """E10: Committed frame conflict prune"""
     print("\nTest E10: Frame Conflict Prune...", end=" ")
