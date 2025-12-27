@@ -161,6 +161,31 @@
 - **Code Comment**: Zeile 336-341 in _check_valid_state
 - **Test**: E10 (erwartet kein Pruning, function disabled)
 
+---
+
+#### Committed Segment Definition
+
+**Mechanismus**: EdgeID = `tuple[piece_id, segment_id]` (hashable)
+
+**Frame Placement** (Move 1, Zeile 189):
+```python
+new_state.committed_edges.add((piece_id, hyp.segment_id))
+```
+- 1 Segment committed (hyp.segment_id)
+- Restliche Segmente reopened (Zeile 196-201)
+
+**Inner Match** (Move 2, Zeile 133-134):
+```python
+new_state.committed_edges.add((piece_a, seg_a_id))
+new_state.committed_edges.add((piece_b, seg_b_id))
+```
+- 2 Segmente committed (matched edge beide Seiten)
+- piece_b restliche Segmente reopened (Zeile 137-141)
+
+**Beispiel**: 4 Segmente, Segment 0 committed → `open_edges = {(p, 1), (p, 2), (p, 3)}`
+
+---
+
 #### Cost-Update & Validation
 
 **Cost Integrity**: state.py:261-283 (`validate_cost_consistency`)
@@ -308,6 +333,27 @@ if (n_placed < threshold or len(open_edges) == 0 or len(inner_candidates) == 0) 
 
 ---
 
+#### Debug-Output
+
+**Gefordert** (design/09_edgecases.md §F1):
+- prune_reasons (counts per reason)
+- beam_sizes (per iteration history)
+- top_candidates (frame hypotheses + inner candidates)
+- config_dump (complete MatchingConfig)
+- last_best_state (best partial bei NO_SOLUTION)
+
+**Status V1**: NICHT implementiert
+- beam_search() sammelt keine Debug-Metriken (Zeile 28-112)
+- expand_state() trackt keine prune_reasons (Zeile 163 silent continue)
+- Fokus: Kern-Algorithmus funktionsfähig (33/33 tests)
+
+**TODO**: Schritt 10 (Debug-Bundle Integration)
+- Instrumentation in beam_search() loop
+- prune_reasons via _check_valid_state return value
+- beam_sizes history tracking
+
+---
+
 ## Design-Entscheidungen
 
 ### D1: Completion-Definition
@@ -374,6 +420,22 @@ if (n_placed < threshold or len(open_edges) == 0 or len(inner_candidates) == 0) 
 - **Tests**: E2, E3, E5, E6
 - **Limitation**: reversal_used/sign_flip_used nicht implementiert (V1)
 
+**Koordinaten-Konvention**:
+- **Winkel-System**: CCW positiv, range [-180, 180) (models.py:14)
+- **180° Flip** (expansion.py:287-290):
+  ```python
+  theta_B = pose_A.theta_deg + 180.0
+  theta_B = theta_B % 360.0  # Normalisierung [0, 360)
+  ```
+- **Translation** (expansion.py:299):
+  ```python
+  T_B = mid_a_F - R_B @ mid_b_local
+  pose_B = Pose2D(x_mm=T_B[0], y_mm=T_B[1], theta_deg=theta_B)
+  ```
+  - `mid_a_F` = chord midpoint von seg_a (Frame coords)
+  - `R_B @ mid_b_local` = rotierter midpoint von seg_b
+  - Translation aligned chord midpoints exakt
+
 ---
 
 ### D4: Branching Cap
@@ -415,6 +477,16 @@ if (n_placed < threshold or len(open_edges) == 0 or len(inner_candidates) == 0) 
   - Visualisierung zeigt Fortschritt
 - **Implementation**: solver.py Zeile 106-112 (return logic)
 - **Tests**: B5 (beam collapse), B6 (max_expansions)
+
+**Output-Interpretation**:
+- **Typ**: `list[SolverState]` (sorted by cost_total ascending)
+- **Complete Detection**: `state.is_complete()` (solver.py:106-112)
+  - `True` = all_placed AND open_edges==0
+  - `False` = partial solution (D5 fallback)
+- **Status Mapping**: Noch NICHT in beam_search()
+  - Returns `list[SolverState]` (not PuzzleSolution)
+  - Status-Enum-Zuweisung TODO (Schritt 9 Integration)
+  - User muss `is_complete()` prüfen
 
 ---
 
