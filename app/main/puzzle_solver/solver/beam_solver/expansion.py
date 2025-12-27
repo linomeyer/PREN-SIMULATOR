@@ -29,6 +29,7 @@ from solver.models import (
     ContourSegment, PuzzlePiece
 )
 from solver.config import MatchingConfig, FrameModel
+from solver.overlap.collision import penetration_depth_max
 
 
 def expand_state(
@@ -328,8 +329,8 @@ def _check_valid_state(
     if not _check_inside_frame(state, all_pieces, frame, config.tau_frame_mm):
         return False
 
-    # E9: Overlap check (stub for Step 7)
-    overlap_depth = _overlap_stub(state)
+    # E9: Overlap check (SAT/MTV from Step 7)
+    overlap_depth = penetration_depth_max(state, all_pieces)
     if overlap_depth > config.overlap_depth_max_mm_prune:
         return False
 
@@ -426,21 +427,6 @@ def _check_inside_frame(
             return False  # Outside frame
 
     return True
-
-
-def _overlap_stub(state: SolverState) -> float:
-    """
-    Overlap stub (placeholder for Step 7).
-
-    Returns:
-        0.0 (no overlap detected in V1)
-
-    Notes:
-        - E9: Stub for overlap detection
-        - Will be replaced with SAT/MTV in Step 7
-        - For now, assume no overlap
-    """
-    return 0.0
 
 
 def _check_committed_frame_constraints(
