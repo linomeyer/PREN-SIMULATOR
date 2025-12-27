@@ -247,19 +247,36 @@ Siehe `implementation/00_structure.md` für detaillierte Struktur und Abhängigk
 
 ---
 
-### 🔄 Schritt 6: Beam-Solver (Multi-Hypothesen State-Space Search) - NÄCHSTER
+### ✅ Schritt 6: Beam-Solver - ABGESCHLOSSEN
 
-**Status**: NEUER CHAT - Implementation anstehend
+**Datum**: 2025-12-26
 
-**Module**: beam_solver/state.py, expansion.py, solver.py
+**Implementation**: beam_solver/state.py, expansion.py, solver.py (~911 Zeilen)
 
-**Basis**: design/05_solver.md, implementation/00_structure.md §3
+**Tests**: 32/32 (test_beam_solver.py)
 
-**Kritisch**:
-- SolverState Single Source (nur in state.py)
-- EdgeID = tuple[PieceID, int] (keine Hash-Kollision)
-- Frontier: separate Sets (unplaced_pieces, open_edges)
-- Overlap: Stub für Schritt 7
+**Statistik**:
+- state.py: 311 Zeilen, 9 tests (S1-S9)
+- expansion.py: 532 Zeilen, 14 tests (E1-E14 inkl. rotation validation)
+- solver.py: 168 Zeilen, 9 tests (B1-B9)
+
+**Design Decisions Finalisiert**:
+- D1: Completion = all_placed AND open_edges==0 (strikt)
+- D2: open_edges = alle non-committed Segmente + Debug-Kandidaten
+- D3: InnerMatch Pose = 180deg flip + chord-midpoint
+- D4: Branching cap = debug_topN_frame_hypotheses_per_piece (N=5)
+- D5: NO_SOLUTION = return best partial state
+
+**Known Limitations**:
+- reversal/sign_flip: NotImplementedError (V1)
+- Committed conflict check: Disabled (V1)
+
+**Dokumentation**:
+- docs/implementation/06_beam_solver_test_spec.md (finalisiert)
+
+---
+
+### 🔄 Schritt 7: Overlap-Modul (SAT/MTV) - NÄCHSTER
 
 ---
 

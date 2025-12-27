@@ -79,17 +79,18 @@ def expand_state(
 
     # Get frontier
     unplaced_pieces, open_edges = state.get_frontier()
-    n_placed = len(state.placed_pieces)
 
     # Branching cap (D4: reuse debug_topN_frame_hypotheses_per_piece)
     branching_cap = config.debug_topN_frame_hypotheses_per_piece
 
-    # Hybrid frontier switching (design/05_solver.md §Frontier-Ansatz 3)
-    # Priority: If open_edges exist, use inner matching
-    # Also allow frame placement in parallel
+    # Sequential frontier switching (design/05_solver.md §Frontier-Ansatz 3)
+    # Phase 1 (n_placed < 1): Frame placement only (bootstrap, empty state)
+    # Phase 2 (n_placed >= 1): Inner matching (priority), fallback to frame if no open edges
+    n_placed = len(state.placed_pieces)
+    threshold = 1  # V1: Switch after first piece (prevents empty-state inner matching)
 
-    # Move 2: Place via InnerMatchCandidate (if open_edges exist)
-    if len(open_edges) > 0:
+    # Move 2: Place via InnerMatchCandidate (Phase 2: after threshold with candidates available)
+    if n_placed >= threshold and len(open_edges) > 0 and len(inner_candidates) > 0:
         for candidate in inner_candidates:
             seg_a_ref, seg_b_ref = candidate.seg_a_ref, candidate.seg_b_ref
             piece_a, seg_a_id = seg_a_ref
@@ -164,8 +165,8 @@ def expand_state(
 
             new_states.append(new_state)
 
-    # Move 1: Place via FrameHypothesis (for unplaced pieces)
-    if len(unplaced_pieces) > 0:
+    # Move 1: Place via FrameHypothesis (Phase 1: before threshold OR no candidates for Phase 2)
+    if (n_placed < threshold or len(open_edges) == 0 or len(inner_candidates) == 0) and len(unplaced_pieces) > 0:
         # Move 1: Place via FrameHypothesis
         for piece_id in unplaced_pieces:
             if piece_id not in frame_hypotheses:
@@ -384,21 +385,29 @@ def _check_inside_frame(
 
         x_min, y_min, x_max, y_max = piece.bbox_mm
 
+        # Compute bbox center for rotation pivot
+        bbox_cx = (x_min + x_max) / 2.0
+        bbox_cy = (y_min + y_max) / 2.0
+
         # Transform bbox corners to Frame coords
+        # Step 1: Translate corners to be centered at origin
         theta_rad = np.deg2rad(pose.theta_deg)
         cos_t, sin_t = np.cos(theta_rad), np.sin(theta_rad)
         R = np.array([[cos_t, -sin_t],
                       [sin_t, cos_t]])
-        T = np.array([pose.x_mm, pose.y_mm])
 
-        corners_local = np.array([
-            [x_min, y_min],
-            [x_min, y_max],
-            [x_max, y_min],
-            [x_max, y_max]
+        corners_centered = np.array([
+            [x_min - bbox_cx, y_min - bbox_cy],
+            [x_min - bbox_cx, y_max - bbox_cy],
+            [x_max - bbox_cx, y_min - bbox_cy],
+            [x_max - bbox_cx, y_max - bbox_cy]
         ])
 
-        corners_F = (R @ corners_local.T).T + T
+        # Step 2: Rotate around origin (= bbox center)
+        corners_rotated = (R @ corners_centered.T).T
+
+        # Step 3: Translate back to bbox center + apply pose translation
+        corners_F = corners_rotated + np.array([bbox_cx + pose.x_mm, bbox_cy + pose.y_mm])
 
         # Check if all corners inside frame + tolerance
         bbox_x_min = corners_F[:, 0].min()

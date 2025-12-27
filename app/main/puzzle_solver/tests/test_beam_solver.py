@@ -275,6 +275,30 @@ def test_S9_cost_breakdown_consistency():
     print("✓")
 
 
+def test_S9b_cost_consistency_validation():
+    """S9b: validate_cost_consistency() enforces cost_total = sum(breakdown)"""
+    print("\nTest S9b: Cost Validation...", end=" ")
+
+    state = SolverState(all_piece_ids={1, 2})
+
+    # Valid: cost_total = sum(breakdown)
+    state.cost_breakdown = {"frame": 0.5, "inner": 0.3, "penalty": 10.0}
+    state.cost_total = 10.8
+    state.validate_cost_consistency()  # Should pass
+
+    # Invalid: cost_total != sum(breakdown)
+    state.cost_total = 5.0  # Wrong!
+    try:
+        state.validate_cost_consistency()
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "Cost inconsistency" in str(e)
+        assert "5.0" in str(e)  # cost_total
+        assert "10.8" in str(e)  # expected sum
+
+    print("✓")
+
+
 # ========== Test Group E: beam_solver/expansion.py (expand_state) ==========
 
 from solver.beam_solver.expansion import expand_state
@@ -362,6 +386,78 @@ def test_E2_frame_placement_commits_hypothesis(frame_model, config):
     print("✓")
 
 
+def test_E2b_rotation_origin_aligned_bbox(frame_model, config):
+    """E2b: Origin-aligned bbox with 90° rotation (validates rotation fix)"""
+    print("\nTest E2b: Rotation (90°, origin bbox)...", end=" ")
+
+    # Origin-aligned bbox (NOT centered) - would fail with old rotation bug
+    pieces = {1: PuzzlePiece(piece_id=1, bbox_mm=(0, 0, 20, 10))}
+    segments = {1: [make_segment(1, 0, [[0,0],[10,0]])]}
+
+    # Frame hypothesis with 90° rotation
+    hyp = FrameHypothesis(
+        piece_id=1,
+        segment_id=0,
+        side="TOP",
+        pose_grob_F=Pose2D(50, 40, 90),  # 90° rotation
+        features=None,
+        cost_frame=0.1,
+        is_committed=False,
+        uncertainty_mm=5.0
+    )
+
+    frame_hyps = {1: [hyp]}
+
+    # Expand empty state
+    state = SolverState(all_piece_ids={1})
+    new_states = expand_state(state, pieces, segments, frame_hyps, [], config, frame_model)
+
+    # Should succeed: After rotation around bbox center (10, 5):
+    # - bbox (0,0,20,10) → rotated 90° → width/height swapped
+    # - Final position (50-5, 40-10) to (50+5, 40+10) = (45, 30, 55, 50)
+    # - All inside frame [0,100] × [0,80] ✓
+    assert len(new_states) >= 1, "Should place piece (rotation correct)"
+    assert 1 in new_states[0].placed_pieces
+
+    print("✓")
+
+
+def test_E2c_rotation_180deg(frame_model, config):
+    """E2c: 180° rotation validation (common in inner matches)"""
+    print("\nTest E2c: Rotation (180°, origin bbox)...", end=" ")
+
+    # Origin-aligned bbox
+    pieces = {1: PuzzlePiece(piece_id=1, bbox_mm=(0, 0, 20, 10))}
+    segments = {1: [make_segment(1, 0, [[0,0],[10,0]])]}
+
+    # Frame hypothesis with 180° rotation (typical InnerMatch)
+    hyp = FrameHypothesis(
+        piece_id=1,
+        segment_id=0,
+        side="TOP",
+        pose_grob_F=Pose2D(50, 40, 180),  # 180° flip
+        features=None,
+        cost_frame=0.1,
+        is_committed=False,
+        uncertainty_mm=5.0
+    )
+
+    frame_hyps = {1: [hyp]}
+
+    # Expand empty state
+    state = SolverState(all_piece_ids={1})
+    new_states = expand_state(state, pieces, segments, frame_hyps, [], config, frame_model)
+
+    # Should succeed: After 180° rotation around bbox center (10, 5):
+    # - bbox (0,0,20,10) → rotated 180° → flipped
+    # - Final position approx (30, 30, 70, 50)
+    # - All inside frame [0,100] × [0,80] ✓
+    assert len(new_states) >= 1, "Should place piece (180° rotation correct)"
+    assert 1 in new_states[0].placed_pieces
+
+    print("✓")
+
+
 def test_E3_penalty_missing_frame_contact(frame_model, config):
     """E3: Penalty if piece placed via inner match without frame commitment"""
     print("\nTest E3: Missing Frame Penalty...", end=" ")
@@ -401,6 +497,9 @@ def test_E3_penalty_missing_frame_contact(frame_model, config):
     # Expected: penalty added (piece 2 has no frame commitment)
     assert len(new_states) >= 1
     new_state = new_states[0]
+
+    # Verify piece 2 placed
+    assert 2 in new_state.placed_pieces
 
     # cost_total = cost_inner (0.2) + penalty (10.0) = 10.2
     expected_cost = 0.2 + config.penalty_missing_frame_contact

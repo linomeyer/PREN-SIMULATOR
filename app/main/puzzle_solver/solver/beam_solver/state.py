@@ -258,6 +258,30 @@ class SolverState:
                 f"I6 violated: cost_total ({self.cost_total}) must be >= 0.0"
             )
 
+    def validate_cost_consistency(self):
+        """
+        Validate cost_total equals sum of cost_breakdown.
+
+        Raises:
+            ValueError: If cost_total != sum(cost_breakdown.values())
+
+        Notes:
+            - Enforces consistency between aggregated and component costs
+            - Tolerance: 1e-6 (floating point precision)
+            - Should be called after any cost update
+
+        Example:
+            >>> state.cost_breakdown = {'frame': 0.5, 'inner': 0.3}
+            >>> state.cost_total = 0.8
+            >>> state.validate_cost_consistency()  # OK
+        """
+        expected = sum(self.cost_breakdown.values())
+        if abs(self.cost_total - expected) > 1e-6:
+            raise ValueError(
+                f"Cost inconsistency: cost_total={self.cost_total:.6f}, "
+                f"sum(breakdown)={expected:.6f}, breakdown={self.cost_breakdown}"
+            )
+
     @classmethod
     def seed_with_frame_hypothesis(
         cls,
@@ -301,6 +325,7 @@ class SolverState:
         # Set cost
         state.cost_total = hyp.cost_frame
         state.cost_breakdown['frame'] = hyp.cost_frame
+        state.validate_cost_consistency()  # Ensure consistency
 
         # open_edges: D2 policy (all non-committed segments)
         # For seed state, we don't have segment info yet → empty
