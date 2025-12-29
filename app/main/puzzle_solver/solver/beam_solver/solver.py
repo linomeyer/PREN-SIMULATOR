@@ -19,10 +19,16 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from solver.beam_solver.state import SolverState
-from solver.beam_solver.expansion import expand_state
-from solver.models import PuzzlePiece, FrameHypothesis, InnerMatchCandidate
-from solver.config import MatchingConfig, FrameModel
+from .state import SolverState
+from .expansion import expand_state
+from ..models import PuzzlePiece, FrameHypothesis, InnerMatchCandidate
+from ..config import MatchingConfig, FrameModel
+from ..fallback.many_to_one import (
+    create_composite_segments,
+    extend_inner_candidates
+)
+from ..inner_matching.candidates import generate_inner_candidates
+import copy
 
 
 def beam_search(
@@ -166,3 +172,101 @@ def _create_initial_beam(
     beam = sorted(beam, key=lambda s: s.cost_total)[:config.beam_width]
 
     return beam
+
+
+def _attempt_fallback_rerun(
+    original_state: SolverState,
+    all_pieces: dict[int, PuzzlePiece],
+    all_segments: dict[int, list],
+    frame_hypotheses: dict[int, list[FrameHypothesis]],
+    config: MatchingConfig,
+    frame: FrameModel
+) -> tuple[SolverState | None, dict]:
+    """
+    Attempt many-to-one fallback rerun with composite segments.
+
+    Steps:
+    1. Create composite segments from atomic segments (k=2, optionally k=3)
+    2. Generate original atomic candidates
+    3. Extend candidates with composite ↔ atomic matches
+    4. Rerun beam_search with extended candidates and fallback config
+    5. Return best fallback state + debug info
+
+    Args:
+        original_state: Best state from initial beam_search
+        all_pieces: All puzzle pieces
+        all_segments: All atomic segments (grouped by piece_id)
+        frame_hypotheses: Frame hypotheses (same as initial run)
+        config: MatchingConfig (will be copied and modified for fallback)
+        frame: FrameModel for boundary checks
+
+    Returns:
+        (fallback_state, debug_info) tuple:
+        - fallback_state: Best state from fallback run (or None if failed)
+        - debug_info: Dict with composite counts, candidate counts, etc.
+
+    Max iterations: 1 (no recursive fallback)
+
+    Tests: test_fallback.py Tests 22-25
+    """
+    # 1. Extract all segments (flat list)
+    segments_flat = []
+    for seg_list in all_segments.values():
+        segments_flat.extend(seg_list)
+
+    # 2. Create composite segments
+    composite_segments = create_composite_segments(segments_flat, config)
+
+    # 3. Count composites per piece (for debug)
+    composites_per_piece = {}
+    for comp in composite_segments:
+        pid = comp.piece_id
+        composites_per_piece[pid] = composites_per_piece.get(pid, 0) + 1
+
+    # 4. Generate original atomic candidates
+    original_candidates = generate_inner_candidates(segments_flat, config)
+
+    # 5. Extend candidates with composites
+    extended_candidates_dict = extend_inner_candidates(
+        original_candidates,
+        atomic_segments=segments_flat,
+        composite_segments=composite_segments,
+        config=config
+    )
+
+    # 6. Flatten dict to list for beam_search
+    # beam_search expects list[InnerMatchCandidate] (global pool)
+    inner_candidates_flat = []
+    for cand_list in extended_candidates_dict.values():
+        inner_candidates_flat.extend(cand_list)
+
+    # 7. Create fallback config (override beam_width, topk)
+    fallback_config = copy.deepcopy(config)
+    fallback_config.beam_width = config.beam_width_fallback
+    fallback_config.topk_per_segment = config.topk_per_segment_fallback
+
+    # 8. Rerun beam_search with extended candidates
+    fallback_states = beam_search(
+        all_pieces=all_pieces,
+        all_segments=all_segments,
+        frame_hypotheses=frame_hypotheses,
+        inner_candidates=inner_candidates_flat,  # Extended with composites
+        config=fallback_config,
+        frame=frame
+    )
+
+    # 9. Extract best fallback state
+    if not fallback_states:
+        return None, {}
+
+    best_fallback = min(fallback_states, key=lambda s: s.cost_total)
+
+    # 10. Build debug info
+    debug_info = {
+        "composites_created_per_piece": composites_per_piece,
+        "total_composites_created": len(composite_segments),
+        "total_candidates_extended": len(inner_candidates_flat),
+        # "composite_matches_used": []  # TODO: Extract from best_fallback matches
+    }
+
+    return best_fallback, debug_info

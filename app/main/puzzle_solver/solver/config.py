@@ -379,8 +379,11 @@ class MatchingConfig:
     fallback_conf_threshold: float = 0.5
     """Confidence threshold for triggering many-to-one fallback"""
 
-    enable_many_to_one_fallback: bool = True
+    many_to_one_enable: bool = True
     """Enable many-to-one matching fallback"""
+
+    many_to_one_enable_only_if_triggered: bool = True
+    """Only use composites when fallback triggered (not in initial run)"""
 
     many_to_one_max_chain_len: int = 2
     """Maximum chain length for composite segments (2 or 3)"""
@@ -390,6 +393,53 @@ class MatchingConfig:
     Penalty for using composite segments in many-to-one matching.
     Small penalty to avoid unnecessary many-to-one (prefer direct 1:1).
     TODO: Tuning
+    """
+
+    beam_width_fallback: int = 30
+    """
+    Beam width for fallback rerun with many-to-one composite segments.
+    1.5× normal beam_width (20 → 30) to explore composite segment space.
+    V1: Conservative multiplier.
+    TODO: Tuning based on puzzle complexity.
+    """
+
+    topk_per_segment_fallback: int = 15
+    """
+    Top-k candidates per segment during fallback rerun.
+    1.5× normal topk_per_segment (10 → 15) for composite candidate space.
+    V1: Conservative increase.
+    TODO: Tuning based on candidate explosion risk.
+    """
+
+    max_composites_per_piece_k2: int = 6
+    """
+    Maximum k=2 composite segments per piece (adjacent pairs).
+    ~75% of typical 8 segments per piece.
+    V1: First N composites (no smart ranking).
+    TODO: Ranking by flatness/length variance (split-likelihood).
+    """
+
+    max_composites_per_piece_k3: int = 3
+    """
+    Maximum k=3 composite segments per piece (adjacent triples).
+    Only generated if many_to_one_max_chain_len >= 3.
+    V1: Sparse sampling for extreme cases.
+    TODO: Conditional generation (only if k=2 fails).
+    """
+
+    max_total_candidates_fallback: int = 2000
+    """
+    Hard cap on total inner match candidates in fallback mode.
+    Safety limit to prevent combinatorial explosion.
+    Applied globally after prefilters (length, flatness).
+    """
+
+    composite_match_frame: bool = False
+    """
+    Enable composite segments for frame-first matching.
+    V1: False (composites only for inner matching, design §4 line 96).
+    Frame edges typically well-segmented (straight, long).
+    Composites for inner edges (curved, split-prone).
     """
 
     # ========== 8. Debug ==========

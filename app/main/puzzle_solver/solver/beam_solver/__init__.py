@@ -11,9 +11,9 @@ Public exports:
 See docs/implementation/06_beam_solver_test_spec.md for design and tests.
 """
 
-from solver.beam_solver.state import SolverState
-from solver.beam_solver.solver import beam_search
-from solver.beam_solver.expansion import expand_state
+from .state import SolverState
+from .solver import beam_search
+from .expansion import expand_state
 
 __all__ = [
     'SolverState',

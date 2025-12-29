@@ -24,6 +24,8 @@ from .models import (
     SolutionStatus,
     PuzzleSolution,
 )
+from .fallback.many_to_one import compute_confidence, should_trigger_fallback
+from .beam_solver.solver import beam_search, _attempt_fallback_rerun
 
 
 __all__ = [
@@ -97,9 +99,16 @@ def solve_puzzle(pieces: List[PuzzlePiece], frame: FrameModel, config: MatchingC
         [ ] Step 9: Pose-Refinement
         [ ] Step 10: Integration + Tests
     """
+    # NOTE: Full solve_puzzle() pipeline pending Step 10
+    # Step 8 provides: beam_search() + _attempt_fallback_rerun() + confidence functions
+    # Tests can use beam_search() directly with pre-computed inputs
+
     raise NotImplementedError(
-        "Solver V2 implementation in progress.\n"
-        "Current status: Step 1 complete (Config + Models)\n"
-        "See docs/implementation/00_structure.md for roadmap (Steps 2-9)\n"
-        "See docs/design/CLAUDE.md for current implementation status"
+        "solve_puzzle() full pipeline pending (Step 10).\n"
+        "Step 8 (Fallback) implemented:\n"
+        "  - beam_search() in solver.beam_solver.solver\n"
+        "  - _attempt_fallback_rerun() for many-to-one fallback\n"
+        "  - compute_confidence(), should_trigger_fallback() in solver.fallback.many_to_one\n"
+        "\n"
+        "For testing: Call beam_search() directly with pre-computed inputs."
     )
