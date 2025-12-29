@@ -330,7 +330,8 @@ def _check_valid_state(
         return False
 
     # E9: Overlap check (SAT/MTV from Step 7)
-    overlap_depth = penetration_depth_max(state, all_pieces)
+    overlap_depth, debug_info = penetration_depth_max(state, all_pieces, config)
+    # TODO: Log debug_info in Schritt 7/9 (solver-level debug output)
     if overlap_depth > config.overlap_depth_max_mm_prune:
         return False
 

@@ -397,13 +397,18 @@ def _point_in_triangle(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarra
 
 # ========== Main Functions ==========
 
-def penetration_depth(poly_a: np.ndarray, poly_b: np.ndarray) -> float:
+def penetration_depth(
+    poly_a: np.ndarray,
+    poly_b: np.ndarray,
+    config: 'MatchingConfig'
+) -> float:
     """
     Compute penetration depth between two polygons.
 
     Args:
         poly_a: Polygon A (N, 2) in mm
         poly_b: Polygon B (M, 2) in mm
+        config: MatchingConfig with polygon_nonconvex_strategy and nonconvex_aggregation
 
     Returns:
         Penetration depth (MTV length) in mm, 0.0 if no overlap
@@ -415,15 +420,32 @@ def penetration_depth(poly_a: np.ndarray, poly_b: np.ndarray) -> float:
 
     Algorithm:
         1. Check if both convex → direct SAT/MTV
-        2. If non-convex → triangulate
+        2. If non-convex → triangulate (per config.polygon_nonconvex_strategy)
         3. Test all triangle pairs
-        4. Aggregate: max(depths) (conservative)
+        4. Aggregate: config.nonconvex_aggregation ("max" for V1)
 
     Notes:
-        - Uses triangulation (Option B) for non-convex
-        - Aggregation: "max" (conservative for pruning)
+        - V1: Only "triangulation" strategy supported
+        - V1: Only "max" aggregation supported
+        - Other strategies/aggregations raise NotImplementedError
         - No NaNs/Exceptions guaranteed
+
+    Raises:
+        NotImplementedError: If config specifies unsupported strategy/aggregation (V2 features)
     """
+    # Validate config (V1 limitations)
+    if config.polygon_nonconvex_strategy != "triangulation":
+        raise NotImplementedError(
+            f"V1 only supports polygon_nonconvex_strategy='triangulation', "
+            f"got '{config.polygon_nonconvex_strategy}' (V2 feature)"
+        )
+
+    if config.nonconvex_aggregation != "max":
+        raise NotImplementedError(
+            f"V1 only supports nonconvex_aggregation='max', "
+            f"got '{config.nonconvex_aggregation}' (V2 feature)"
+        )
+
     # Ensure valid input
     poly_a = np.asarray(poly_a, dtype=np.float64)
     poly_b = np.asarray(poly_b, dtype=np.float64)
@@ -439,12 +461,12 @@ def penetration_depth(poly_a: np.ndarray, poly_b: np.ndarray) -> float:
         # Both convex → direct SAT/MTV
         return _sat_mtv_convex(poly_a, poly_b)
 
-    # Non-convex → triangulate
+    # Non-convex → triangulate (Option B per config)
     triangles_a = [poly_a] if a_convex else _triangulate_earcut(poly_a)
     triangles_b = [poly_b] if b_convex else _triangulate_earcut(poly_b)
 
-    # Test all triangle pairs
-    max_depth = 0.0
+    # Test all triangle pairs and aggregate per config
+    max_depth = 0.0  # "max" aggregation (config.nonconvex_aggregation)
     for tri_a in triangles_a:
         for tri_b in triangles_b:
             depth = _sat_mtv_convex(tri_a, tri_b)
@@ -455,25 +477,36 @@ def penetration_depth(poly_a: np.ndarray, poly_b: np.ndarray) -> float:
 
 def penetration_depth_max(
     state: SolverState,
-    pieces: dict[int, PuzzlePiece]
-) -> float:
+    pieces: dict[int, PuzzlePiece],
+    config: 'MatchingConfig'
+) -> tuple[float, dict]:
     """
     Maximum penetration depth over all placed piece pairs.
 
     Args:
         state: SolverState with poses_F
         pieces: Dict piece_id → PuzzlePiece
+        config: MatchingConfig (passed to penetration_depth)
 
     Returns:
-        Max depth in mm (0.0 if no overlaps)
+        Tuple of (max_depth_mm, debug_info):
+        - max_depth_mm: float, maximum penetration depth in mm (0.0 if no overlaps)
+        - debug_info: dict with keys:
+            * "max_depth_mm": float (same as return value)
+            * "max_pair": tuple[int, int] or None (piece IDs with max depth)
+            * "n_overlapping_pairs": int (count of pairs with depth > EPS)
+            * "depths_per_pair": list[tuple[int, int, float]] (all checked pairs)
 
     Notes:
         - Only checks placed pieces (in state.poses_F)
         - Transforms to world coordinates using poses_F
         - Pairwise O(n²) check
         - Returns 0.0 if contour_mm not available (test scenarios)
+        - Debug info enables solver logging (design/06_collision.md §7)
     """
     max_depth = 0.0
+    max_pair = None
+    depths_per_pair = []
 
     # Only check pieces that have poses (defensive - avoids KeyError)
     placed_with_poses = [pid for pid in state.placed_pieces if pid in state.poses_F]
@@ -504,7 +537,24 @@ def penetration_depth_max(
             )
 
             # Compute depth
-            depth = penetration_depth(poly_a_world, poly_b_world)
-            max_depth = max(max_depth, depth)
+            depth = penetration_depth(poly_a_world, poly_b_world, config)
 
-    return max_depth
+            # Track for debug
+            depths_per_pair.append((id_a, id_b, depth))
+
+            # Update max
+            if depth > max_depth:
+                max_depth = depth
+                max_pair = (id_a, id_b)
+
+    # Build debug info
+    n_overlapping = sum(1 for (_, _, d) in depths_per_pair if d > EPS)
+
+    debug_info = {
+        "max_depth_mm": max_depth,
+        "max_pair": max_pair,
+        "n_overlapping_pairs": n_overlapping,
+        "depths_per_pair": depths_per_pair
+    }
+
+    return max_depth, debug_info

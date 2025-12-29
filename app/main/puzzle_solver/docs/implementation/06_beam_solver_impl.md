@@ -345,7 +345,7 @@ if (n_placed < threshold or len(open_edges) == 0 or len(inner_candidates) == 0) 
 **Status V1**: NICHT implementiert
 - beam_search() sammelt keine Debug-Metriken (Zeile 28-112)
 - expand_state() trackt keine prune_reasons (Zeile 163 silent continue)
-- Fokus: Kern-Algorithmus funktionsfähig (33/33 tests)
+- Fokus: Kern-Algorithmus funktionsfähig (32/32 tests)
 
 **TODO**: Schritt 10 (Debug-Bundle Integration)
 - Instrumentation in beam_search() loop
@@ -595,7 +595,7 @@ return (len(self.placed_pieces) == self.n_pieces and
 ### Test Coverage
 ```bash
 pytest tests/test_beam_solver.py -v
-# 33/33 passing (0.23s)
+# 32/32 passing (0.23s)
 ```
 
 **Test-Gruppen**:
@@ -660,7 +660,7 @@ Alle aus `MatchingConfig` (Schritt 1):
 | expansion.py | 541 | 0 | 1 main + 5 helpers | 14 (E1-E14) |
 | solver.py | 168 | 0 | 2 (main + helper) | 9 (B1-B9) |
 | __init__.py | 22 | 0 | 0 (exports) | - |
-| **Gesamt** | **1066** | **1** | **15** | **33/33 ✅** |
+| **Gesamt** | **1066** | **1** | **15** | **32/32 ✅** |
 
 **Implementierungs-Details**:
 - 10 Fields in SolverState (placed, unplaced, poses, edges, cost, ...)
@@ -670,7 +670,7 @@ Alle aus `MatchingConfig` (Schritt 1):
 - 3 Pruning-Checks (inside frame with rotation fix, overlap stub, dedup)
 - 5 Design Decisions (D1-D5, finalized)
 
-**Test-Runtime**: 0.23s (alle 33 tests)
+**Test-Runtime**: 0.23s (alle 32 tests)
 
 ---
 

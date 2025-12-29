@@ -17,6 +17,7 @@ import pytest
 import numpy as np
 from solver.beam_solver.state import SolverState
 from solver.models import PuzzlePiece, Pose2D
+from solver.config import MatchingConfig
 
 # Tolerances from Spec §1
 EPS = 1e-9
@@ -26,6 +27,18 @@ TOL_MM = 1e-3
 pytest.importorskip("solver.overlap.collision", reason="collision.py not implemented yet")
 
 from solver.overlap.collision import penetration_depth, penetration_depth_max
+
+
+
+# ========== Fixtures ==========
+
+@pytest.fixture
+def config():
+    """MatchingConfig with default overlap settings"""
+    return MatchingConfig(
+        polygon_nonconvex_strategy="triangulation",
+        nonconvex_aggregation="max"
+    )
 
 
 # ========== Test Polygons (Spec §2) ==========
@@ -77,50 +90,50 @@ def l_shape():
     ], dtype=np.float64)
 
 
-# ========== Unit Tests: penetration_depth(poly_a, poly_b) ==========
+# ========== Unit Tests: penetration_depth(poly_a, poly_b, config) ==========
 # Spec §3: Tests 1-11 (Convex Polygons)
 
-def test_01_no_overlap_separated():
+def test_01_no_overlap_separated(config):
     """Test 1: No Overlap (separated squares)"""
     a = sq10()
     b = sq10_shift(20, 0)
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert abs(depth - 0.0) <= TOL_MM
 
 
-def test_02_tangential_edge_contact():
+def test_02_tangential_edge_contact(config):
     """Test 2: Tangential edge contact (touching, no overlap)"""
     a = sq10()
     b = sq10_shift(10, 0)  # touches at x=10
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert abs(depth - 0.0) <= TOL_MM
 
 
-def test_03_tangential_corner_contact():
+def test_03_tangential_corner_contact(config):
     """Test 3: Tangential corner contact (touching at one corner)"""
     a = sq10()
     b = sq10_shift(10, 10)  # touches at (10,10)
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert abs(depth - 0.0) <= TOL_MM
 
 
-def test_04_small_overlap():
+def test_04_small_overlap(config):
     """Test 4: Small Overlap (0.5mm)"""
     a = sq10()
     b = sq10_shift(9.5, 0)  # overlap in x: 0.5
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert 0.49 <= depth <= 0.51
 
 
-def test_05_larger_overlap():
+def test_05_larger_overlap(config):
     """Test 5: Larger Overlap (3.0mm)"""
     a = sq10()
     b = sq10_shift(7.0, 0)  # overlap in x: 3.0
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert 2.99 <= depth <= 3.01
 
 
-def test_06_full_containment():
+def test_06_full_containment(config):
     """Test 6: Full Containment (inner square inside outer square)"""
     outer = np.array([
         [0, 0],
@@ -136,24 +149,24 @@ def test_06_full_containment():
     ], dtype=np.float64)
 
     # MTV minimal: 5.0mm (shortest distance to make disjoint)
-    depth_outer_inner = penetration_depth(outer, inner)
-    depth_inner_outer = penetration_depth(inner, outer)
+    depth_outer_inner = penetration_depth(outer, inner, config)
+    depth_inner_outer = penetration_depth(inner, outer, config)
 
     assert 4.99 <= depth_outer_inner <= 5.01
     assert 4.99 <= depth_inner_outer <= 5.01  # Symmetry
 
 
-def test_07_identical_polygons():
+def test_07_identical_polygons(config):
     """Test 7: Identical polygons (maximal overlap case)"""
     a = sq10()
     b = sq10()  # identical
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
 
     # MTV minimal is 10.0mm (along x or y to make disjoint)
     assert 9.99 <= depth <= 10.01
 
 
-def test_08_symmetry_property():
+def test_08_symmetry_property(config):
     """Test 8: Symmetry property (random shift overlap)"""
     a = rect20x10()
     b = np.array([
@@ -163,8 +176,8 @@ def test_08_symmetry_property():
         [15, 12]
     ], dtype=np.float64)  # Overlap in x: 5, in y: 8
 
-    depth_ab = penetration_depth(a, b)
-    depth_ba = penetration_depth(b, a)
+    depth_ab = penetration_depth(a, b, config)
+    depth_ba = penetration_depth(b, a, config)
 
     # Symmetry
     assert abs(depth_ab - depth_ba) <= TOL_MM
@@ -173,7 +186,7 @@ def test_08_symmetry_property():
     assert 4.99 <= depth_ab <= 5.01
 
 
-def test_09_translation_invariance():
+def test_09_translation_invariance(config):
     """Test 9: Translation invariance"""
     a1 = sq10()
     b1 = sq10_shift(9.5, 0)  # depth ~0.5
@@ -181,49 +194,49 @@ def test_09_translation_invariance():
     a2 = sq10_shift(100, -50)
     b2 = sq10_shift(109.5, -50)
 
-    depth1 = penetration_depth(a1, b1)
-    depth2 = penetration_depth(a2, b2)
+    depth1 = penetration_depth(a1, b1, config)
+    depth2 = penetration_depth(a2, b2, config)
 
     assert abs(depth1 - depth2) <= TOL_MM
     assert 0.49 <= depth1 <= 0.51  # Same as Test 4
     assert 0.49 <= depth2 <= 0.51
 
 
-def test_10_robustness_cw_vs_ccw():
+def test_10_robustness_cw_vs_ccw(config):
     """Test 10: Robustness to polygon orientation (CW vs CCW)"""
     a_ccw = sq10()
     a_cw = np.flipud(sq10())  # Reversed order (CW)
     b = sq10_shift(9.5, 0)
 
-    depth_ccw = penetration_depth(a_ccw, b)
-    depth_cw = penetration_depth(a_cw, b)
+    depth_ccw = penetration_depth(a_ccw, b, config)
+    depth_cw = penetration_depth(a_cw, b, config)
 
     # Both should give ~0.5mm (same as Test 4)
     assert 0.49 <= depth_ccw <= 0.51
     assert 0.49 <= depth_cw <= 0.51
 
 
-def test_11_thin_polygon_stability():
+def test_11_thin_polygon_stability(config):
     """Test 11: Very thin polygon stability (no overlap)"""
     a = thin()
     b = thin() + np.array([1.0, 0])  # Separated by 1.0mm (width=0.1)
 
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert abs(depth - 0.0) <= TOL_MM  # No NaNs/Exceptions
 
 
 # ========== Unit Tests: Non-convex Polygons ==========
 # Spec §4: Tests 12-13 (Strategy-agnostic)
 
-def test_12_nonconvex_no_overlap():
+def test_12_nonconvex_no_overlap(config):
     """Test 12: Non-convex no overlap"""
     a = l_shape()
     b = sq10_shift(30, 0)
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
     assert abs(depth - 0.0) <= TOL_MM
 
 
-def test_13_nonconvex_clear_overlap():
+def test_13_nonconvex_clear_overlap(config):
     """Test 13: Non-convex clear overlap (must be > 0)"""
     a = l_shape()
     b = np.array([
@@ -233,7 +246,7 @@ def test_13_nonconvex_clear_overlap():
         [2, 6]
     ], dtype=np.float64)  # Inside L-shape, clear intersection
 
-    depth = penetration_depth(a, b)
+    depth = penetration_depth(a, b, config)
 
     # Strategy-agnostic bounds
     assert depth > 0.1  # Clearly > 0
@@ -243,7 +256,7 @@ def test_13_nonconvex_clear_overlap():
 # ========== Unit Tests: penetration_depth_max(state, pieces) ==========
 # Spec §5: Tests 14-16 (State-Level)
 
-def test_14_max_depth_single_overlap_pair():
+def test_14_max_depth_single_overlap_pair(config):
     """Test 14: Max depth over 3 pieces (1 overlap pair)"""
     # Setup pieces
     pieces = {
@@ -261,11 +274,11 @@ def test_14_max_depth_single_overlap_pair():
         3: Pose2D(30, 0, 0)    # no overlap
     }
 
-    depth_max = penetration_depth_max(state, pieces)
+    depth_max, _ = penetration_depth_max(state, pieces, config)
     assert 0.49 <= depth_max <= 0.51
 
 
-def test_15_max_depth_returns_maximum():
+def test_15_max_depth_returns_maximum(config):
     """Test 15: Max depth returns the maximum (two overlapping pairs)"""
     pieces = {
         1: PuzzlePiece(piece_id=1, contour_mm=sq10()),
@@ -281,11 +294,11 @@ def test_15_max_depth_returns_maximum():
         3: Pose2D(-7.0, 0, 0)  # overlap 3.0mm with p1
     }
 
-    depth_max = penetration_depth_max(state, pieces)
+    depth_max, _ = penetration_depth_max(state, pieces, config)
     assert 2.99 <= depth_max <= 3.01  # Max is 3.0mm
 
 
-def test_16_ignores_unplaced_pieces():
+def test_16_ignores_unplaced_pieces(config):
     """Test 16: Ignores unplaced pieces (pose missing)"""
     pieces = {
         1: PuzzlePiece(piece_id=1, contour_mm=sq10()),
@@ -302,5 +315,5 @@ def test_16_ignores_unplaced_pieces():
     }
     # p3 not in poses_F
 
-    depth_max = penetration_depth_max(state, pieces)
+    depth_max, _ = penetration_depth_max(state, pieces, config)
     assert 0.49 <= depth_max <= 0.51  # No exception from p3
