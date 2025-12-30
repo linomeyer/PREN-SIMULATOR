@@ -60,13 +60,36 @@ Test-Spezifikation Schritt 8: Confidence + Fallback (Many-to-one)
 - neu berechneten Features (`length_mm`, `flatness_error`, `direction_angle`, `profile_1d`)
 - Referenz auf Quelle: `source_segment_ids`
 
-### Test 7: chain_len=2 erzeugt Paare
-**Setup:** Segmente s0,s1,s2; max_chain_len=2  
-**Expected:** genau (s0+s1) und (s1+s2)
+### Test 7: chain_len=2 erzeugt Composite-Paare
 
-### Test 8: chain_len=3 erzeugt zusaetzliche Triples
-**Setup:** Segmente s0,s1,s2,s3; max_chain_len=3  
-**Expected:** Paare wie oben + (s0+s1+s2) und (s1+s2+s3)
+**Setup:**
+- 2 Pieces mit unterschiedlichen Längen
+- Piece 1: 4 Segmente (lengths [10, 12, 8, 15])
+- Piece 2: 3 Segmente (lengths [20, 22, 24])
+- max_composites_per_piece_k2 = 6
+
+**Expected:**
+- 5 k=2 Composites total (3 von Piece 1, 2 von Piece 2)
+- Adjacent pairs only: Piece 1: (s0+s1, s1+s2, s2+s3), Piece 2: (s0+s1, s1+s2)
+- Segment IDs: 2000, 2001, 2002, 2003, 2004
+- Längen kompatibel für ±20% Filter zwischen Pieces
+
+**Rationale:** Realistic 2-piece fixture enables ±20% length filter validation (same-piece filter blocks intra-piece matches).
+
+### Test 8: chain_len=3 erzeugt Triples
+
+**Setup:**
+- Same fixture as Test 7 (2 pieces, 4+3 segments)
+- max_composites_per_piece_k3 = 3
+
+**Expected:**
+- 8 Composites total (5 k=2 + 3 k=3)
+- k=2 Composites: 5 total (as Test 7)
+- k=3 Composites: 3 total (Piece 1: s0+s1+s2, s1+s2+s3; Piece 2: s0+s1+s2)
+- Segment IDs: 2000-2004 (k=2), 3000-3002 (k=3)
+- Length filter applies to all composite↔atomic candidate generation
+
+**Rationale:** Validates both chain lengths simultaneously with realistic multi-piece constraints.
 
 ### Test 9: Nicht-adjazent wird nie kombiniert
 **Setup:** Segmente s0,s1,s2  
