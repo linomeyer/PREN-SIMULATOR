@@ -277,8 +277,6 @@ def test_ec_01_small_frame_contact_no_hard_block(config, frame, small_frame_piec
     Expected: Kein INVALID_INPUT, status in {OK, OK_WITH_FALLBACK, LOW_CONFIDENCE}
     Rationale: A1 fordert Soft-Constraint statt Abbruch
     """
-    pytest.skip("solve_puzzle pending (Step 10)")
-
     # Setup
     config.min_frame_seg_len_mm = 10.0
     pieces = [small_frame_piece]
@@ -307,8 +305,6 @@ def test_ec_02_small_frame_debug_marks_piece(config, frame, small_frame_piece):
     Expected: debug.flags["missing_frame_contact_pieces"] enthält piece_id
     Rationale: Diagnosefähigkeit bei A1
     """
-    pytest.skip("solve_puzzle pending (Step 10)")
-
     # Setup
     config.min_frame_seg_len_mm = 10.0
     pieces = [small_frame_piece]
@@ -1011,8 +1007,6 @@ def test_fm_12_invalid_input_n_not_in_range(config, frame, invalid_n_pieces):
     Expected: INVALID_INPUT, debug.failure_reason == "invalid_n_pieces"
     Rationale: Status-Enum nennt diesen Fall
     """
-    pytest.skip("solve_puzzle pending (Step 10)")
-
     # Setup: 7 pieces
     solution = solve_puzzle(invalid_n_pieces, frame, config)
 
@@ -1032,8 +1026,6 @@ def test_fm_13_invalid_input_missing_contour(config, frame, missing_contour_piec
     Expected: INVALID_INPUT, debug.failure_reason == "missing_contour"
     Rationale: Input-Validierung
     """
-    pytest.skip("solve_puzzle pending (Step 10)")
-
     # Setup: Piece with None contour
     solution = solve_puzzle([missing_contour_piece], frame, config)
 
@@ -1052,8 +1044,6 @@ def test_fm_14_invalid_input_unit_mismatch(config, frame):
     Expected: INVALID_INPUT, debug.failure_reason in {"missing_scale_px_to_mm", "unit_mismatch"}
     Rationale: Solver arbeitet mm-basiert
     """
-    pytest.skip("solve_puzzle pending (Step 10)")
-
     # Setup: Piece with pixel coordinates but no scale
     piece = PuzzlePiece(
         piece_id=1,

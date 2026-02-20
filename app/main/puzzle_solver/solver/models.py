@@ -18,7 +18,7 @@ NOTE: SolverState is NOT defined here. It is defined in beam_solver/state.py
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Any
 import numpy as np
@@ -229,7 +229,7 @@ class SolutionStatus(Enum):
     Values:
         OK: Solution found, all constraints satisfied
         OK_WITH_FALLBACK: Solution found after many-to-one fallback
-        LOW_CONFIDENCE: Solution found but confidence below threshold
+        LOW_CONFIDENCE_SOLUTION: Solution found but confidence below threshold
         NO_SOLUTION: No complete solution found (beam exhausted or pruned)
         REFINEMENT_FAILED: Solution found but refinement failed (overlap > threshold)
         INVALID_INPUT: Invalid input (e.g., n not in {4,5,6})
@@ -239,10 +239,54 @@ class SolutionStatus(Enum):
     """
     OK = "OK"
     OK_WITH_FALLBACK = "OK_WITH_FALLBACK"
-    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    LOW_CONFIDENCE_SOLUTION = "LOW_CONFIDENCE_SOLUTION"
     NO_SOLUTION = "NO_SOLUTION"
     REFINEMENT_FAILED = "REFINEMENT_FAILED"
     INVALID_INPUT = "INVALID_INPUT"
+
+
+@dataclass
+class DebugBundle:
+    """
+    Debug information bundle for puzzle solution.
+
+    Mandatory fields (DBG-01):
+        status: Solution status string
+        config_dump: Configuration as dict
+        n_pieces: Number of pieces in puzzle
+        area_score: Area coverage score [0..1] or None
+        frame_hypotheses: Top-N frame hypotheses per piece
+        inner_candidates: Top-N inner match candidates per segment pair
+        solver_summary: Solver statistics (prune_counts, beam_exhausted, etc.)
+        last_best_state: Best state seen (serialized) or None
+
+    Optional fields (context-dependent):
+        fallback: Fallback statistics if triggered
+        refinement: Refinement info if run
+        collision: Collision detection details
+        failure_reason: Reason string for INVALID_INPUT
+        affected_pieces: Piece IDs for INVALID_INPUT
+
+    Notes:
+        - Required for all non-OK status codes (DBG-01)
+        - Serializable to JSON (DBG-02)
+        - See docs/test_spec/09_edgecases_test_spec.md §4 for schema
+    """
+    status: str
+    config_dump: dict
+    n_pieces: int
+    area_score: Optional[float]
+    frame_hypotheses: dict  # {piece_id: [FrameHypothesis, ...]}
+    inner_candidates: dict  # {(seg_a, seg_b): [InnerMatchCandidate, ...]}
+    solver_summary: dict  # {prune_counts, beam_exhausted, max_expansions_reached, ...}
+    last_best_state: Optional[dict] = None
+
+    # Optional context-specific fields:
+    fallback: Optional[dict] = None
+    refinement: Optional[dict] = None
+    collision: Optional[dict] = None
+    failure_reason: Optional[str] = None
+    affected_pieces: Optional[list] = None
 
 
 @dataclass
@@ -255,10 +299,11 @@ class PuzzleSolution:
         poses_M: Optional piece poses in Machine coordinate system (M), only if T_MF set
         matches: List of match constraints used in solution (type TBD in later steps)
         total_cost: Total solution cost (sum of frame, inner, penalties, overlap)
+        cost_breakdown: Breakdown of cost components (frame, inner, penalties, overlap)
         confidence: Solution confidence = exp(-k_conf * total_cost)
         status: Solution status (see SolutionStatus enum)
         overlap_violations: Number of piece pairs with overlap > threshold (for A/B testing)
-        debug: Optional debug bundle (type TBD in Step 9)
+        debug: Optional debug bundle (see DebugBundle)
 
     Notes:
         - Primary output: poses_F (Frame coordinate system)
@@ -270,7 +315,8 @@ class PuzzleSolution:
     poses_M: Optional[dict[int | str, Pose2D]] = None
     matches: list = None  # Type TBD in later steps (MatchConstraint)
     total_cost: float = 0.0
+    cost_breakdown: dict[str, float] = field(default_factory=dict)
     confidence: float = 0.0
     status: SolutionStatus = SolutionStatus.NO_SOLUTION
     overlap_violations: int = 0  # For A/B test comparison
-    debug: Optional[Any] = None  # DebugBundle type TBD in Step 9
+    debug: Optional[DebugBundle] = None

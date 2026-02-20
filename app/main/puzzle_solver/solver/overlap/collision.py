@@ -547,6 +547,32 @@ def penetration_depth_max(
                 max_depth = depth
                 max_pair = (id_a, id_b)
 
+    # A3: Track non-convex polygon usage (Step 9)
+    nonconvex_cases = []
+    for i in range(len(placed_with_poses)):
+        id_i = placed_with_poses[i]
+        piece_i = pieces[id_i]
+        if piece_i.contour_mm is not None:
+            poly_i_world = _transform_polygon(piece_i.contour_mm, state.poses_F[id_i])
+            if not _is_convex(poly_i_world):
+                # Count triangles that would be created
+                triangles_i = _triangulate_earcut(poly_i_world)
+                nonconvex_cases.append({
+                    "piece_id": id_i,
+                    "components": len(triangles_i)
+                })
+
+    # F4: Track near-zero flapping cases (Step 9)
+    # Near-zero: |depth| < epsilon (potential numerical instability)
+    epsilon_mm = 0.01  # Hardcoded for Step 9 (TODO: config in Step 10?)
+    near_zero_cases = []
+    for (id_a, id_b, depth) in depths_per_pair:
+        if 0 < depth < epsilon_mm:
+            near_zero_cases.append({
+                "piece_pair": (id_a, id_b),
+                "overlap_depth": depth
+            })
+
     # Build debug info
     n_overlapping = sum(1 for (_, _, d) in depths_per_pair if d > EPS)
 
@@ -554,7 +580,10 @@ def penetration_depth_max(
         "max_depth_mm": max_depth,
         "max_pair": max_pair,
         "n_overlapping_pairs": n_overlapping,
-        "depths_per_pair": depths_per_pair
+        "depths_per_pair": depths_per_pair,
+        "nonconvex_strategy": config.polygon_nonconvex_strategy if nonconvex_cases else None,
+        "nonconvex_pieces": nonconvex_cases,
+        "near_zero_cases": near_zero_cases  # F4
     }
 
     return max_depth, debug_info

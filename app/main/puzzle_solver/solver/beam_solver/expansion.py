@@ -146,12 +146,12 @@ def expand_state(
             new_state.cost_breakdown['inner'] = \
                 new_state.cost_breakdown.get('inner', 0.0) + candidate.cost_inner
 
-            # Penalty if piece_b has no committed frame constraint (E3)
+            # Penalty if piece_b has no committed frame constraint (E3, A1)
             if piece_b not in new_state.committed_frame_constraints:
                 penalty = config.penalty_missing_frame_contact
                 new_state.cost_total += penalty
-                new_state.cost_breakdown['penalty'] = \
-                    new_state.cost_breakdown.get('penalty', 0.0) + penalty
+                new_state.cost_breakdown['penalty_missing_frame_contact'] = \
+                    new_state.cost_breakdown.get('penalty_missing_frame_contact', 0.0) + penalty
 
             # Record match
             new_state.matches.append({
@@ -344,6 +344,42 @@ def _check_valid_state(
     #     return False
 
     return True
+
+
+def _check_valid_state_with_reason(
+    state: SolverState,
+    all_pieces: dict[int, PuzzlePiece],
+    config: MatchingConfig,
+    frame: FrameModel
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if state is valid and return prune reason (Step 9 / DBG-04).
+
+    Args:
+        state: State to validate
+        all_pieces: Piece data
+        config: Config with pruning thresholds
+        frame: FrameModel for boundary checks
+
+    Returns:
+        (is_valid, prune_reason) tuple:
+        - is_valid: True if valid, False if pruned
+        - prune_reason: None if valid, or one of: "outside_frame", "overlap", "conflict"
+    """
+    # E8: Outside frame check
+    if not _check_inside_frame(state, all_pieces, frame, config.tau_frame_mm):
+        return False, "outside_frame"
+
+    # E9: Overlap check
+    overlap_depth, debug_info = penetration_depth_max(state, all_pieces, config)
+    if overlap_depth > config.overlap_depth_max_mm_prune:
+        return False, "overlap"
+
+    # E10: Conflict check (skipped in V1)
+    # if not _check_committed_frame_constraints(...):
+    #     return False, "conflict"
+
+    return True, None
 
 
 def _check_inside_frame(

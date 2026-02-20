@@ -22,6 +22,7 @@ from .models import (
     FrameHypothesis,
     InnerMatchCandidate,
     SolutionStatus,
+    DebugBundle,
     PuzzleSolution,
 )
 from .fallback.many_to_one import compute_confidence, should_trigger_fallback
@@ -43,6 +44,7 @@ __all__ = [
     "FrameHypothesis",
     "InnerMatchCandidate",
     "SolutionStatus",
+    "DebugBundle",
     "PuzzleSolution",
 ]
 

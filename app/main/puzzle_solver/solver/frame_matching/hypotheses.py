@@ -159,9 +159,9 @@ def generate_frame_hypotheses(
 
     # 1. Generate hypotheses for all segment×side combinations
     for seg in segments:
-        # Skip short segments
-        if seg.length_mm < config.min_frame_seg_len_mm:
-            continue
+        # A1 Soft Constraint: Allow short segments (Step 9)
+        # Don't skip - let solver handle via penalty_missing_frame_contact
+        # (Removal of hard block for segments < min_frame_seg_len_mm)
 
         for side in SIDES:
             # Compute features

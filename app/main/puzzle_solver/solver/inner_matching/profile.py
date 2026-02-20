@@ -101,10 +101,13 @@ def extract_1d_profile(
     vec_to_points = resampled_points - chord_start  # (N, 2)
     signed_distances = np.dot(vec_to_points, chord_perp)  # (N,)
 
-    # 4. Optional smoothing (currently disabled)
-    # if config.profile_smoothing_window > 1:
-    #     from scipy.ndimage import uniform_filter1d
-    #     signed_distances = uniform_filter1d(signed_distances, config.profile_smoothing_window)
+    # 4. A2: Minimal smoothing for noise robustness (Step 9)
+    if config.profile_smoothing_window > 1:
+        from scipy.ndimage import gaussian_filter1d
+        # Use Gaussian instead of uniform for better noise handling
+        # sigma = window / 3 (standard Gaussian parameterization)
+        sigma = config.profile_smoothing_window / 3.0
+        signed_distances = gaussian_filter1d(signed_distances, sigma, mode='nearest')
 
     # 5. Store and return
     seg.profile_1d = signed_distances
