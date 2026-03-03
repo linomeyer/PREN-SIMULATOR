@@ -219,6 +219,12 @@ class MatchingConfig:
     min_frame_seg_len_mm: float = 10.0
     """Minimum segment length to be considered for frame contact (mm)"""
 
+    min_seg_len_for_merge_mm: float = 5.0
+    """Minimum segment length for merge during segmentation (mm).
+    Segments shorter than this are merged with neighbors in contour_segmenter.
+    Separate from min_frame_seg_len_mm (solver penalty threshold).
+    Set lower than min_frame_seg_len_mm to allow A1 penalty triggering."""
+
     tau_frame_mm: float = 2.0
     """Tolerance band for inside/outside frame checks (mm, for robustness against noise).
 

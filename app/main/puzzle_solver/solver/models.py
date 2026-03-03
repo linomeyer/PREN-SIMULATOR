@@ -264,7 +264,8 @@ class DebugBundle:
         fallback: Fallback statistics if triggered
         refinement: Refinement info if run
         collision: Collision detection details
-        failure_reason: Reason string for INVALID_INPUT
+        failure_reason: Reason slug for INVALID_INPUT (e.g., "invalid_n_pieces")
+        failure_message: Human-readable failure message for INVALID_INPUT
         affected_pieces: Piece IDs for INVALID_INPUT
 
     Notes:
@@ -286,7 +287,21 @@ class DebugBundle:
     refinement: Optional[dict] = None
     collision: Optional[dict] = None
     failure_reason: Optional[str] = None
+    failure_message: Optional[str] = None
     affected_pieces: Optional[list] = None
+
+    # Dict-like access methods (for test compatibility)
+    def __getitem__(self, key: str):
+        """Dict-like access: debug["status"]"""
+        return getattr(self, key)
+
+    def __contains__(self, key: str):
+        """Dict-like 'in' check: "status" in debug"""
+        return hasattr(self, key)
+
+    def get(self, key: str, default=None):
+        """Dict-like get with default: debug.get("foo", None)"""
+        return getattr(self, key, default)
 
 
 @dataclass

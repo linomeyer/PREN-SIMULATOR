@@ -23,6 +23,7 @@ def create_debug_bundle(
     last_best_state: Optional[SolverState] = None,
     fallback_info: Optional[dict] = None,
     failure_reason: Optional[str] = None,
+    failure_message: Optional[str] = None,
     affected_pieces: Optional[list] = None
 ) -> DebugBundle:
     """
@@ -41,7 +42,8 @@ def create_debug_bundle(
             - frontier_mode: str (optional)
         last_best_state: Best state seen (for NO_SOLUTION)
         fallback_info: Fallback statistics (if fallback triggered)
-        failure_reason: Reason string (for INVALID_INPUT)
+        failure_reason: Reason slug (for INVALID_INPUT, e.g., "invalid_n_pieces")
+        failure_message: Human-readable failure message (for INVALID_INPUT)
         affected_pieces: Piece IDs affected (for INVALID_INPUT)
 
     Returns:
@@ -80,6 +82,7 @@ def create_debug_bundle(
         refinement=None,  # TODO: Step 10 refinement
         collision=None,  # Populated by collision module
         failure_reason=failure_reason,
+        failure_message=failure_message,
         affected_pieces=affected_pieces
     )
 
@@ -125,7 +128,7 @@ def _serialize_solver_state(state: SolverState) -> dict:
         - Includes cost_total, placed pieces, open_edges count
     """
     placed_dict = {}
-    for piece_id, pose in state.placed.items():
+    for piece_id, pose in state.poses_F.items():
         placed_dict[str(piece_id)] = {
             "x_mm": _sanitize_float(pose.x_mm),
             "y_mm": _sanitize_float(pose.y_mm),
@@ -135,7 +138,7 @@ def _serialize_solver_state(state: SolverState) -> dict:
     return {
         "cost_total": _sanitize_float(state.cost_total),
         "placed": placed_dict,
-        "unplaced_count": len(state.unplaced),
+        "unplaced_count": len(state.unplaced_pieces),
         "open_edges_count": len(state.open_edges),
         "is_complete": state.is_complete(),
     }
@@ -244,7 +247,7 @@ def validate_puzzle_input(
     pieces: list[PuzzlePiece],
     frame,  # FrameModel
     config: MatchingConfig
-) -> Optional[tuple[str, list]]:
+) -> Optional[tuple[str, str, list]]:
     """
     Validate puzzle input (INVALID_INPUT check).
 
@@ -254,36 +257,60 @@ def validate_puzzle_input(
         config: MatchingConfig
 
     Returns:
-        None if valid, or (failure_reason, affected_pieces) tuple if invalid
+        None if valid, or (slug, message, affected_pieces) tuple if invalid
 
     Invalid cases (FM-12/13/14):
-        - n not in {4, 5, 6}
-        - Piece missing contour_mm
-        - Piece with empty contour
-        - Frame dimensions invalid
+        Fail-fast order:
+        1. Contours: missing or empty contour_mm (FM-13)
+        2. Units: pixel coords without scale_px_to_mm (FM-14)
+        3. n-range: n not in {1..10} (FM-12)
     """
-    # Check piece count
-    n = len(pieces)
-    if not (4 <= n <= 6):
-        return (f"Invalid piece count: {n} (must be 4-6)", [])
-
-    # Check each piece
+    # 1. Check contours (FM-13) - fail-fast
+    # Distinguish: no contour at all vs pixel-without-mm (handled in step 2)
     affected = []
-    for i, piece in enumerate(pieces):
-        # Check contour_mm exists
-        if piece.contour_mm is None:
+    for piece in pieces:
+        # No contour at all (both None)
+        if piece.contour is None and piece.contour_mm is None:
             affected.append(piece.piece_id)
             continue
 
-        # Check contour not empty
-        if len(piece.contour_mm) == 0:
+        # Has contour_mm but empty
+        if piece.contour_mm is not None and len(piece.contour_mm) == 0:
             affected.append(piece.piece_id)
 
     if affected:
-        return (f"Pieces missing or empty contour_mm: {affected}", affected)
+        return (
+            "missing_contour",
+            f"Pieces missing or empty contour_mm: {affected}",
+            affected
+        )
 
-    # Check frame
+    # 2. Check units (FM-14) - fail-fast
+    # Pixel coords without mm conversion
+    for piece in pieces:
+        if piece.contour is not None and piece.contour_mm is None:
+            if not hasattr(piece, 'scale_px_to_mm') or piece.scale_px_to_mm is None:
+                return (
+                    "missing_scale_px_to_mm",
+                    f"Piece has pixel coords without scale_px_to_mm",
+                    [piece.piece_id]
+                )
+
+    # 3. Check piece count (FM-12) - fail-fast
+    n = len(pieces)
+    if not (1 <= n <= 10):
+        return (
+            "invalid_n_pieces",
+            f"Invalid piece count: {n} (must be 1-10)",
+            []
+        )
+
+    # 4. Check frame dimensions
     if frame.inner_width_mm <= 0 or frame.inner_height_mm <= 0:
-        return ("Invalid frame dimensions", [])
+        return (
+            "invalid_frame_dimensions",
+            f"Invalid frame dimensions",
+            []
+        )
 
     return None  # Valid input

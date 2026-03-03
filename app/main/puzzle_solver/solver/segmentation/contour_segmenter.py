@@ -69,7 +69,7 @@ def segment_piece(piece: PuzzlePiece, config: MatchingConfig) -> List[ContourSeg
 
     contour_mm = piece.contour_mm
     target_range = config.target_seg_count_range
-    min_len_mm = config.min_frame_seg_len_mm
+    min_len_mm = config.min_seg_len_for_merge_mm
 
     # Step 1: Find split candidates via curvature maxima
     split_indices = _find_split_candidates(

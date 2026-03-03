@@ -194,6 +194,15 @@ def expand_state(
                 new_state.cost_breakdown['frame'] = \
                     new_state.cost_breakdown.get('frame', 0.0) + hyp.cost_frame
 
+                # A1: Penalize short frame segments (soft constraint)
+                if piece_id in all_segments:
+                    segment = all_segments[piece_id][hyp.segment_id]
+                    if segment.length_mm < config.min_frame_seg_len_mm:
+                        penalty = config.penalty_missing_frame_contact
+                        new_state.cost_total += penalty
+                        new_state.cost_breakdown['penalty_missing_frame_contact'] = \
+                            new_state.cost_breakdown.get('penalty_missing_frame_contact', 0.0) + penalty
+
                 # Update open_edges (D2: all non-committed segments)
                 if piece_id in all_segments:
                     for seg in all_segments[piece_id]:
